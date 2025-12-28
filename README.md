@@ -51,6 +51,10 @@ curl http://localhost:3000/health
 
 If you'd like, I can add a `Procfile`, a `render.yaml` template, or step-by-step instructions for creating the Render service.
 
+### Optional: Auto-register slash commands on start
+
+If you'd like the app to automatically attempt to register slash commands at startup, set the environment variable `REGISTER_COMMANDS_ON_START=true` on Render. This will run `deploy-commands.js` once at startup. Be careful — registering often can hit rate limits (429). Recommended: Run this manually when you add/modify commands, or use the `register` npm script.
+
 ---
 
 ## Security notice ⚠️

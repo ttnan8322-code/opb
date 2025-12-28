@@ -20,6 +20,14 @@ const client = new Client({ intents });
 
 client.commands = new Collection();
 
+// Startup diagnostics: show configured intents and remind to enable Message Content
+console.log('Configured gateway intents:', intents.map(i => i && i.toString ? i.toString() : i));
+if (!intents.includes(GatewayIntentBits.MessageContent)) {
+  console.warn('⚠️ Message Content intent is NOT included in the client setup. Message-based commands will NOT work unless this intent is enabled and also allowed in the Bot settings in the Discord Developer Portal.');
+} else {
+  console.log('✅ Message Content intent is included in the client configuration. Make sure it is also enabled in the Discord Developer Portal.');
+}
+
 // dynamically load commands
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const commandFiles = fs.readdirSync("./commands").filter(file => file.endsWith(".js"));
@@ -45,6 +53,10 @@ for (const file of commandFiles) {
 // simple message-based prefix handling: prefix is "op" (case-insensitive)
 client.on("messageCreate", async (message) => {
   try {
+    // Diagnostics: log incoming messages (truncated) so you can confirm the bot receives them in Render logs
+    const preview = (message.content || '').slice(0, 200).replace(/\n/g, ' ');
+    console.log(`messageCreate from ${message.author?.tag || message.author?.id} (bot=${message.author?.bot}) preview="${preview}"`);
+
     if (!message.content) return;
     if (message.author?.bot) return;
 
@@ -56,7 +68,11 @@ client.on("messageCreate", async (message) => {
 
     const commandName = parts[1].toLowerCase();
     const command = client.commands.get(commandName);
-    if (!command) return;
+
+    if (!command) {
+      console.log(`Unknown message command requested: ${commandName}`);
+      return;
+    }
 
     // call the same execute exported for slash commands; pass message and client
     await command.execute(message, client);
@@ -106,6 +122,19 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => console.log(`Health server listening on port ${PORT}`));
+
+// Optional: auto-register slash commands if explicitly enabled
+if (process.env.REGISTER_COMMANDS_ON_START === 'true') {
+  (async () => {
+    try {
+      console.log('REGISTER_COMMANDS_ON_START is true: importing deploy-commands.js to register slash commands...');
+      await import('./deploy-commands.js');
+      console.log('Slash command registration attempt finished.');
+    } catch (err) {
+      console.error('Error while auto-registering commands:', err && err.message ? err.message : err);
+    }
+  })();
+}
 
 // Ensure we have a token and make login failures visible in Render logs
 if (!process.env.TOKEN) {

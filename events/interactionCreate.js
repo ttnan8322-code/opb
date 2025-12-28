@@ -26,8 +26,14 @@ function getEvolutionChain(rootCard) {
 }
 
 export async function execute(interaction, client) {
-  // handle component interactions (buttons) first
+  // Diagnostics: log interactions to verify they arrive in runtime logs
   try {
+    try {
+      console.log(`interactionCreate: type=${interaction.type} user=${interaction.user?.tag || interaction.user?.id} id=${interaction.id} isCommand=${interaction.isCommand ? interaction.isCommand() : false}`);
+    } catch (e) {
+      console.log('interactionCreate: unable to stringify interaction metadata', e && e.message ? e.message : e);
+    }
+    // handle component interactions (buttons) first
     // handle select menus first
     if (interaction.isStringSelectMenu && interaction.isStringSelectMenu()) {
       const id = interaction.customId || "";
