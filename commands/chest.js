@@ -69,14 +69,43 @@ export async function execute(interactionOrMessage, client) {
   const legendaryWon = [];
   const legendaryDuplicates = [];
 
+  const normalizeKey = k => String(k || '').toLowerCase();
+  const getItemCount = (items, key) => {
+    if (!items) return 0;
+    const lk = normalizeKey(key);
+    if (typeof items.get === 'function') {
+      for (const k of items.keys()) {
+        if (String(k).toLowerCase() === lk) return items.get(k) || 0;
+      }
+      return 0;
+    }
+    for (const k of Object.keys(items || {})) {
+      if (String(k).toLowerCase() === lk) return items[k] || 0;
+    }
+    return 0;
+  };
+
   const putItem = (key, qty) => {
     if (!qty) return;
+    const storageKey = normalizeKey(key);
     if (hasMap) {
-      const prev = inventory.items.get(key) || 0;
-      inventory.items.set(key, prev + qty);
+      // preserve any existing exact-key if present (case-insensitive)
+      let foundKey = null;
+      for (const k of inventory.items.keys()) {
+        if (String(k).toLowerCase() === storageKey) { foundKey = k; break; }
+      }
+      const useKey = foundKey || storageKey;
+      const prev = inventory.items.get(useKey) || 0;
+      inventory.items.set(useKey, prev + qty);
     } else {
       inventory.items = inventory.items || {};
-      inventory.items[key] = (inventory.items[key] || 0) + qty;
+      // find existing key case-insensitively
+      let foundKey = null;
+      for (const k of Object.keys(inventory.items || {})) {
+        if (String(k).toLowerCase() === storageKey) { foundKey = k; break; }
+      }
+      const useKey = foundKey || storageKey;
+      inventory.items[useKey] = (inventory.items[useKey] || 0) + qty;
     }
   };
 
@@ -96,7 +125,7 @@ export async function execute(interactionOrMessage, client) {
     }
 
     for (const leg of rewards.legendaries || []) {
-      const owned = hasMap ? (inventory.items.get(leg) || 0) : (inventory.items && inventory.items[leg] || 0);
+      const owned = getItemCount(inventory.items, leg);
       if (owned) {
         totalResetTokens += 1; // fallback for duplicate legendary
         legendaryDuplicates.push(leg);

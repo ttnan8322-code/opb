@@ -163,8 +163,8 @@ export async function execute(interaction, client) {
 
     if (interaction.isButton()) {
       const id = interaction.customId || "";
-      // only handle known prefixes (include shop_). Let per-message duel_* collectors handle duel interactions.
-      if (!id.startsWith("info_") && !id.startsWith("collection_") && !id.startsWith("quest_") && !id.startsWith("help_") && !id.startsWith("drop_claim") && !id.startsWith("shop_")) return;
+      // only handle known prefixes (include shop_ and duel_). Let per-message duel_* collectors handle duel interactions.
+      if (!id.startsWith("info_") && !id.startsWith("collection_") && !id.startsWith("quest_") && !id.startsWith("help_") && !id.startsWith("drop_claim") && !id.startsWith("shop_") && !id.startsWith("duel_")) return;
       // ignore duel_* here so message-level collectors in `commands/duel.js` receive them
       if (id.startsWith("duel_")) return;
 
