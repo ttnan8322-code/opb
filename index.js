@@ -1,3 +1,6 @@
+// index.js now acts as a lightweight shim. Primary code is split into `bot.js` and `server.js`.
+console.log('index.js shim — load bot.js to run the Discord bot.');
+import './bot.js';
 console.log("🔥 INDEX.JS VERSION: CLEAN_LOGIN_V1");
 
 import { Client, GatewayIntentBits, Collection } from "discord.js";

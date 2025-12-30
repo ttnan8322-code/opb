@@ -5,13 +5,14 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
+    "start": "npx concurrently \"node server.js\" \"node bot.js\"",
     "deploy": "node deploy-commands.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "concurrently": "^8.2.2",
     "discord.js": "^14.24.0",
     "dotenv": "^16.4.5",
     "mongodb": "^6.20.0",
