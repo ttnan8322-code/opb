@@ -1,3 +1,5 @@
+console.log("🔥 INDEX.JS VERSION: CLEAN_LOGIN_V1");
+
 import { Client, GatewayIntentBits, Collection } from "discord.js";
 import { config } from "dotenv";
 import { connectDB } from "./config/database.js";
@@ -281,35 +283,18 @@ if (process.env.REGISTER_COMMANDS_ON_START === 'true') {
   })();
 }
 
-// Ensure we have a token and make login failures visible in Render logs
 if (!process.env.TOKEN) {
-  console.error("❌ TOKEN is not set in environment variables. Set TOKEN in your Render service settings.");
-  // Keep the process alive so you can inspect the service; don't exit immediately
-} else {
-  console.log(`Found TOKEN of length ${process.env.TOKEN.length} characters — performing pre-login checks...`);
-
-  // Add event diagnostics for connection issues
-  client.on('error', (err) => console.error('client error:', err));
-  client.on('shardError', (err) => console.error('shard error:', err));
-  client.on('shardDisconnect', (event, shardId) => console.warn('shard disconnect:', { event, shardId }));
-
-  // Listen for ready event — discord.js will emit this when fully connected and identified
-  client.once('ready', () => {
-    console.log(`✅ Logged in as ${client.user.tag}`);
-    globalThis.GATEWAY_MODE = 'connected';
-  });
-
-  // Handle reconnects
-  client.on('shardResume', (replayed, shardId) => {
-    console.log(`✅ Shard ${shardId} resumed, replayed ${replayed} events`);
-  });
-
-  if (process.env.DISABLE_GATEWAY === 'true' || process.env.INTERACTIONS_ONLY === 'true') {
-    console.log('DISABLE_GATEWAY/INTERACTIONS_ONLY is set — skipping Discord gateway login and running in interactions-only mode.');
-    globalThis.GATEWAY_MODE = 'disabled';
-  } else {
-    // Single, clean login. Let discord.js manage the gateway lifecycle.
-    // If it fails, the process crashes and Render restarts it.
-    await client.login(process.env.TOKEN);
-  }
+  console.error("❌ TOKEN is missing");
+  process.exit(1);
 }
+
+console.log("🚀 Calling client.login() now…");
+
+client.once("ready", () => {
+  console.log(`✅ Logged in as ${client.user.tag}`);
+});
+
+client.on("error", err => console.error("Client error:", err));
+client.on("shardError", err => console.error("Shard error:", err));
+
+await client.login(process.env.TOKEN);
