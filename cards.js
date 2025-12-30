@@ -10,6 +10,8 @@ export const RANKS = {
   UR: { name: "UR", color: 0x8B0000, icon: "https://files.catbox.moe/200d01.webp", value: 6 }, // dark red
 };
 
+import { extraCards } from "./cards.extra.js";
+
 export const cards = [
   // LUFFY PROGRESSION - Chronological (Kid -> Dawn Island -> Captain -> Worst Gen -> Emperor -> Warrior)
   // ...existing card objects...
@@ -1595,7 +1597,7 @@ export const cards = [
     type: "Support",
     ability: "Boosts team HP by 5%",
     boost: { hp: 5 },
-    image: "https://files.catbox.moe/0gfj06.webp",
+    image: "https://files.catbox.moe/pl1ec5.webp",
     evolutions: ["nojiko_c_02"],
   },
   {
@@ -2264,7 +2266,7 @@ export const cards = [
   { id: "Hatchan_c_01", name: "Hatchan", title: "kid Hatchan ", rank: "C", power: 20, attackRange: [4, 12], health: 72, type: "Support", ability: "Boosts team HP by 10%",
     boost: { hp: 10 }, image: "https://files.catbox.moe/1t7w93.webp", evolutions: ["Hatchan_b_02"] },
   { id: "Hatchan_b_02", name: "Hatchan", title: "member of the Arlong pirates", rank: "B", power: 44, attackRange: [9, 19], health: 110, type: "Support", ability: "Boosts team HP by 10%",
-    boost: { hp: 10 }, image: "https://files.catbox.moe/g0z1xz.webp", evolutions: ["Hatchan_b_03"] },
+    boost: { hp: 10 }, image: "https://files.catbox.moe/g0z1xz.webp", evolutions: ["Hatchan_b_03"], isUpgrade: true, upgradeRequirements: { cost: 1000, minLevel: 10 } },
   { id: "Hatchan_b_03", name: "Hatchan", title: "Takoyaki seller", rank: "B", power: 56, attackRange: [11, 22], health: 130, type: "Support", ability: "Boosts team HP by 15%",
     boost: { hp: 15 }, image: "https://files.catbox.moe/e1n1h2.webp", evolutions: [], isUpgrade: true, upgradeRequirements: { cost: 1800, minLevel: 15 } },
 
@@ -2332,8 +2334,49 @@ export const cards = [
     boost: { hp: 10 }, image: "https://files.catbox.moe/xoxme3.webp" },
 
   // --- END NEW ADDITIONS ---
-  { id: "Wier_c_01", name: "Wier", title: "Random East Blue natives", rank: "C", power: 14, attackRange: [2, 7], health: 48, type: "Support", ability: "Boosts team HP by 10%",
-    boost: { hp: 10 }, image: "https://files.catbox.moe/h8h05v.webp" }
+    { id: "Eldoraggo_a_01", name: "Eldoraggo", title: "Captain of the Eldoraggo pirates", rank: "A", power: 135, attackRange: [24, 44], health: 195, type: "Attack", specialAttack: { name: "Voice beam", range: [100, 140], gif: "https://files.catbox.moe/6a8zww.gif" }, ability: null, image: "https://files.catbox.moe/depimd.webp", evolutions: [] },
+    { id: "golass_b_01", name: "Golass", title: "Member of the Eldoraggo pirates", rank: "B", power: 60, attackRange: [12, 24], health: 140, type: "Attack", ability: null, image: "https://files.catbox.moe/e2noif.webp", evolutions: [] },
+    { id: "Danny_c_01", name: "Danny", title: "Member of the Eldoraggo pirates", rank: "C", power: 20, attackRange: [3, 9], health: 70, type: "Support", ability: "Boosts team HP by 10%", boost: { hp: 10 }, image: "https://files.catbox.moe/hgtcj9.webp", evolutions: [] },
+    { id: "Denny_c_01", name: "Denny", title: "Member of the Eldoraggo pirates", rank: "C", power: 20, attackRange: [3, 9], health: 70, type: "Support", ability: "Boosts team HP by 10%", boost: { hp: 10 }, image: "https://files.catbox.moe/2b2ed1.webp", evolutions: [] },
+    { id: "Donny_c_01", name: "Donny", title: "Member of the Eldoraggo pirates", rank: "C", power: 20, attackRange: [3, 9], health: 70, type: "Support", ability: "Boosts team HP by 10%", boost: { hp: 10 }, image: "https://files.catbox.moe/ou995y.webp", evolutions: [] },
+
+    // Captain of the Bear pirates
+    { id: "BearKing_b_01", name: "Bear King", title: "Captain of the Bear pirates", rank: "B", power: 70, attackRange: [12, 28], health: 155, type: "Attack", ability: null, image: "https://files.catbox.moe/r6vyo3.webp", evolutions: [] },
+
+    // TITLE: Member of the Trump pirates
+    { id: "Boojack_b_01", name: "Boojack", title: "Member of the Trump pirates", rank: "B", power: 70, attackRange: [12, 28], health: 155, type: "Attack", ability: null, image: "https://files.catbox.moe/x0taoj.webp", evolutions: [] },
+    { id: "HoneyQueen_b_01", name: "Honey Queen", title: "Member of the Trump pirates", rank: "B", power: 70, attackRange: [12, 26], health: 150, type: "Attack", ability: null, image: "https://files.catbox.moe/5snn8s.webp", evolutions: [] },
+    { id: "PinJoker_b_01", name: "Pin Joker", title: "Member of the Trump pirates", rank: "B", power: 65, attackRange: [12, 24], health: 145, type: "Attack", ability: null, image: "https://files.catbox.moe/hr2qik.webp", evolutions: [] },
+    { id: "SkunkOne_b_01", name: "Skunk One", title: "Member of the Trump pirates", rank: "B", power: 70, attackRange: [12, 28], health: 155, type: "Attack", ability: null, image: "https://files.catbox.moe/kvnamm.webp", evolutions: [] },
+
+    // TITLE: Revolutionary Army - Belo Betty
+    { id: "BeloBetty_c_01", name: "Belo Betty", title: "Teen Belo Betty", rank: "C", power: 20, attackRange: [3, 9], health: 70, type: "Support", ability: "Boosts team HP by 10%", boost: { hp: 10 }, image: "https://files.catbox.moe/tkm8nl.webp", evolutions: ["Belobetty_b_02"] },
+    { id: "Belobetty_b_02", name: "Belo Betty", title: "Member of the Revolutionary Army", rank: "B", power: 60, attackRange: [12, 24], health: 140, type: "Attack", ability: null, image: "https://files.catbox.moe/i30ahk.webp", evolutions: ["Belobetty_a_03"], isUpgrade: true, upgradeRequirements: { cost: 6000, minLevel: 25 } },
+    { id: "Belobetty_a_03", name: "Belo Betty", title: "Member of the Revolutionary Army", rank: "A", power: 125, attackRange: [24, 44], health: 180, type: "Attack", ability: null, image: "https://files.catbox.moe/on9pwx.webp", evolutions: [], isUpgrade: true, upgradeRequirements: { cost: 8000, minLevel: 40 } },
+
+    // TITLE: Revolutionary Army - Ahiru
+    { id: "Ahiru_b_01", name: "Ahiru", title: "Member of the Revolutionary army", rank: "B", power: 60, attackRange: [12, 24], health: 140, type: "Attack", ability: null, image: "https://files.catbox.moe/lulqfh.webp", evolutions: ["Ahiru_b_02"] },
+    { id: "Ahiru_b_02", name: "Ahiru", title: "Member of the Revolutionary army", rank: "B", power: 70, attackRange: [14, 30], health: 160, type: "Attack", ability: null, image: "https://files.catbox.moe/vjnxwy.webp", evolutions: [], isUpgrade: true, upgradeRequirements: { cost: 6000, minLevel: 25 } },
+
+    // TITLE: Revolutionary Army - Ginny
+    { id: "Ginny_c_01", name: "Ginny", title: "Kid Ginny", rank: "C", power: 20, attackRange: [3, 9], health: 70, type: "Support", ability: "Boosts team HP by 10%", boost: { hp: 10 }, image: "https://files.catbox.moe/j873cp.webp", evolutions: ["Ginny_b_02"] },
+    { id: "Ginny_b_02", name: "Ginny", title: "Member of the Revolutionary Army", rank: "B", power: 60, attackRange: [12, 24], health: 140, type: "Attack", ability: null, image: "https://files.catbox.moe/gciuhr.webp", evolutions: ["Ginny_a_03"], isUpgrade: true, upgradeRequirements: { cost: 6000, minLevel: 25 } },
+    { id: "Ginny_a_03", name: "Ginny", title: "Member of the Revolutionary Army", rank: "A", power: 125, attackRange: [24, 44], health: 180, type: "Attack", ability: null, image: "https://files.catbox.moe/6outcz.webp", evolutions: [], isUpgrade: true, upgradeRequirements: { cost: 8000, minLevel: 40 } },
+
+    // TITLE: Random pirates/bandits
+    { id: "Yurikah_b_01", name: "Yurikah", title: "Random pirates/bandits", rank: "B", power: 60, attackRange: [12, 24], health: 140, type: "Attack", ability: null, image: "https://files.catbox.moe/uj25kq.webp", evolutions: [] },
+    { id: "Gally_c_01", name: "Gally", title: "Random pirates/bandits", rank: "C", power: 20, attackRange: [3, 9], health: 70, type: "Support", ability: "Boosts team HP by 10%", boost: { hp: 10 }, image: "https://files.catbox.moe/ssj4e9.webp", evolutions: [] },
+    { id: "Woonan_c_01", name: "Woonan", title: "Random pirates/bandits", rank: "C", power: 20, attackRange: [3, 9], health: 70, type: "Support", ability: "Boosts team HP by 10%", boost: { hp: 10 }, image: "https://files.catbox.moe/d8yxa5.webp", evolutions: ["Woonan_b_02"] },
+    { id: "Woonan_b_02", name: "Woonan", title: "Random pirates/bandits", rank: "B", power: 60, attackRange: [12, 24], health: 140, type: "Attack", ability: null, image: "https://files.catbox.moe/lb92u5.webp", evolutions: [], isUpgrade: true, upgradeRequirements: { cost: 6000, minLevel: 25 } },
+    { id: "Pete_c_01", name: "Pete", title: "Random pirates/bandits", rank: "C", power: 20, attackRange: [3, 9], health: 70, type: "Support", ability: "Boosts team HP by 10%", boost: { hp: 10 }, image: "https://files.catbox.moe/32orfk.webp", evolutions: [] },
+    { id: "RileyBrothers_c_01", name: "Riley Brothers", title: "Random pirates/bandits", rank: "C", power: 20, attackRange: [3, 9], health: 70, type: "Support", ability: "Boosts team HP by 10%", boost: { hp: 10 }, image: "https://files.catbox.moe/eoksbo.webp", evolutions: [] },
+    { id: "Niseusopp_c_01", name: "Nise Usopp", title: "Random pirates/bandits", rank: "C", power: 20, attackRange: [3, 9], health: 70, type: "Support", ability: "Boosts team HP by 10%", boost: { hp: 10 }, image: "https://files.catbox.moe/6m3tk5.webp", evolutions: [] },
+    { id: "Niseluffy_b_01", name: "Nise Luffy", title: "Random pirates/bandits", rank: "B", power: 60, attackRange: [12, 24], health: 140, type: "Attack", ability: null, image: "https://files.catbox.moe/mqu8fm.webp", evolutions: [] },
+    { id: "Nisezoro_b_01", name: "Nise Zoro", title: "Random pirates/bandits", rank: "B", power: 60, attackRange: [12, 24], health: 140, type: "Attack", ability: null, image: "https://files.catbox.moe/dffdxn.webp", evolutions: [] },
+    { id: "Billy_c_01", name: "Billy", title: "Random pirates/bandits", rank: "C", power: 20, attackRange: [3, 9], health: 70, type: "Support", ability: "Boosts team HP by 10%", boost: { hp: 10 }, image: "https://files.catbox.moe/61ibqm.webp", evolutions: [] },
+    { id: "Dick_b_01", name: "Dick", title: "Random pirates/bandits", rank: "B", power: 60, attackRange: [12, 24], health: 140, type: "Attack", ability: null, image: "https://files.catbox.moe/ho8w8a.webp", evolutions: [] },
+    { id: "Desire_b_01", name: "Desire", title: "Random pirates/bandits", rank: "B", power: 60, attackRange: [12, 24], health: 140, type: "Attack", ability: null, image: "https://files.catbox.moe/t0ys5c.webp", evolutions: [] },
+    { id: "mooji_c_01", name: "Mooji", title: "Random pirates/bandits", rank: "C", power: 20, attackRange: [3, 9], health: 70, type: "Support", ability: "Boosts team HP by 10%", boost: { hp: 10 }, image: "https://files.catbox.moe/oz3pnl.webp", evolutions: [] },
 ];
 
 // Normalize base card stats so power, attack ranges, health and upgrade minLevel
@@ -2341,17 +2384,62 @@ export const cards = [
 // card definitions follow the same rounding rules used at runtime.
 import { roundNearestFive } from "./lib/stats.js";
 
+// Merge optional extra cards maintained in `cards.extra.js` so they are
+// included in normalization below.
+try {
+  if (Array.isArray(extraCards) && extraCards.length) {
+    cards.push(...extraCards);
+  }
+} catch (e) {
+  console.warn('Failed to merge extraCards:', e && e.message ? e.message : e);
+}
+
 for (const c of cards) {
   if (!c || typeof c !== 'object') continue;
-  if (typeof c.power === 'number') c.power = roundNearestFive(c.power);
+  // preserve original attack range so we can optionally revert at runtime
   if (Array.isArray(c.attackRange)) {
-    c.attackRange[0] = Number(c.attackRange[0] || 0);
-    c.attackRange[1] = Number(c.attackRange[1] || 0);
+    try { c._originalAttackRange = [Number(c.attackRange[0] || 0), Number(c.attackRange[1] || 0)]; } catch (e) { c._originalAttackRange = null; }
   }
+
+  if (typeof c.power === 'number') c.power = roundNearestFive(c.power);
+
+  if (Array.isArray(c.attackRange)) {
+    c.attackRange[0] = roundNearestFive(Number(c.attackRange[0] || 0));
+    c.attackRange[1] = roundNearestFive(Number(c.attackRange[1] || 0));
+  }
+
   if (typeof c.health === 'number') c.health = roundNearestFive(c.health);
   if (c.upgradeRequirements && typeof c.upgradeRequirements.minLevel === 'number') {
     const ml = c.upgradeRequirements.minLevel;
     c.upgradeRequirements.minLevel = (ml === 2) ? 1 : roundNearestFive(ml);
+  }
+}
+
+// Validate for duplicate card ids (fatal at startup)
+(() => {
+  const seen = new Map();
+  const dupes = new Set();
+  for (const c of cards) {
+    if (!c || !c.id) continue;
+    const id = String(c.id);
+    if (seen.has(id)) dupes.add(id);
+    else seen.set(id, true);
+  }
+  if (dupes.size > 0) {
+    const list = Array.from(dupes).join(', ');
+    console.error('Duplicate card id(s) detected on startup:', list);
+    throw new Error('Duplicate card id(s) detected: ' + list);
+  }
+})();
+
+// Optionally revert attackRange to original unrounded values at runtime by
+// setting environment variable RESTORE_UNROUNDED_ATTACKS=true. This instructs
+// the loader to restore `attackRange` from the preserved `_originalAttackRange`.
+if (process.env.RESTORE_UNROUNDED_ATTACKS === 'true') {
+  for (const c of cards) {
+    if (c && Array.isArray(c._originalAttackRange) && c._originalAttackRange.length === 2) {
+      c.attackRange = [Number(c._originalAttackRange[0]), Number(c._originalAttackRange[1])];
+    }
   }
 }
 

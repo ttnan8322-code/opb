@@ -326,6 +326,9 @@ async function startDuelTurn(sessionId, channel) {
     }
   }
   // convert any pending skip flags (cards that used special last match-turn) into active exhaustion for this turn
+  // Clear any previous "skipThisTurn" flags (they should only apply for one turn),
+  // then convert any pending skips into the active exhaustion for this current turn.
+  attacker.cards.forEach(c => { c.skipThisTurn = false; });
   attacker.cards.forEach(c => { if (c.skipNextTurnPending) { c.skipThisTurn = true; c.skipNextTurnPending = false; } });
   normalizeLifeIndex(attacker);
   normalizeLifeIndex(defender);

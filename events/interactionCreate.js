@@ -210,7 +210,14 @@ export async function execute(interaction, client) {
             console.error('Error editing drop message after claim:', e && e.message ? e.message : e);
           }
 
-          await interaction.reply({ content: `You claimed **${res.card.name}** (Lv ${res.level}) — check your collection.`, ephemeral: true });
+          // Check if this was a duplicate card (converted to XP) or a new card
+          if (res.result && !res.result.isNew) {
+            const xpGain = res.result.xpGain || 0;
+            const leveledText = res.result.leveled ? ' and leveled up!' : '!';
+            await interaction.reply({ content: `You already own **${res.card.name}**! Converted to **${xpGain} XP**${leveledText}`, ephemeral: true });
+          } else {
+            await interaction.reply({ content: `You claimed **${res.card.name}** (Lv ${res.level}) — check your collection.`, ephemeral: true });
+          }
           return;
         } catch (e) {
           console.error('drop claim handler error:', e && e.message ? e.message : e);

@@ -121,15 +121,15 @@ export async function execute(interactionOrMessage) {
       inv.chests.A += chestGain.A;
       await inv.save();
 
-      // Record quest progress for completing a mission
+      // Record quest progress for completing a mission (count each question as 1 mission)
       try {
         const [dailyQuests, weeklyQuests] = await Promise.all([
           Quest.getCurrentQuests("daily"),
           Quest.getCurrentQuests("weekly")
         ]);
         await Promise.all([
-          dailyQuests.recordAction(userId, "mission", 1),
-          weeklyQuests.recordAction(userId, "mission", 1)
+          dailyQuests.recordAction(userId, "mission", picked.length),
+          weeklyQuests.recordAction(userId, "mission", picked.length)
         ]);
       } catch (e) {
         console.error("Failed to record mission quest progress:", e);

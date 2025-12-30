@@ -143,6 +143,17 @@ export async function execute(interactionOrMessage) {
           Quest.getCurrentQuests("daily"),
           Quest.getCurrentQuests("weekly")
         ]);
+        // Ensure quests are generated before recording (in case they are empty)
+        if (!dailyQuests.quests.length) {
+          const { generateQuests } = await import("../lib/quests.js");
+          dailyQuests.quests = generateQuests("daily");
+          await dailyQuests.save();
+        }
+        if (!weeklyQuests.quests.length) {
+          const { generateQuests } = await import("../lib/quests.js");
+          weeklyQuests.quests = generateQuests("weekly");
+          await weeklyQuests.save();
+        }
         await Promise.all([
           dailyQuests.recordAction(userId, "gamble", 1),
           weeklyQuests.recordAction(userId, "gamble", 1)
@@ -350,6 +361,17 @@ export async function execute(interactionOrMessage) {
           Quest.getCurrentQuests("daily"),
           Quest.getCurrentQuests("weekly")
         ]);
+        // Ensure quests are generated before recording
+        if (!dailyQuests.quests.length) {
+          const { generateQuests } = await import("../lib/quests.js");
+          dailyQuests.quests = generateQuests("daily");
+          await dailyQuests.save();
+        }
+        if (!weeklyQuests.quests.length) {
+          const { generateQuests } = await import("../lib/quests.js");
+          weeklyQuests.quests = generateQuests("weekly");
+          await weeklyQuests.save();
+        }
         await Promise.all([
           dailyQuests.recordAction(userId, "gamble", 1),
           weeklyQuests.recordAction(userId, "gamble", 1)

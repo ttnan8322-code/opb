@@ -71,7 +71,7 @@ export async function execute(interactionOrMessage, client) {
 
   let card = fuzzyFindCard(query);
   if (!card) {
-    const reply = `Please state a value.`;
+    const reply = `Please state a valid card.`;
     if (isInteraction) await interactionOrMessage.reply({ content: reply, ephemeral: true });
     else await channel.send(reply);
     return;

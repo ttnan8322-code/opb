@@ -12,4 +12,12 @@ export async function execute(client) {
   } catch (e) {
     console.error('Error initializing drop manager:', e && e.message ? e.message : e);
   }
+
+  try {
+    const { init: initReset } = await import('../lib/pullResetNotifier.js');
+    await initReset(client);
+    console.log('✅ Pull-reset notifier initialized');
+  } catch (e) {
+    console.error('Error initializing pull-reset notifier:', e && e.message ? e.message : e);
+  }
 }

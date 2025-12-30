@@ -33,6 +33,7 @@ function isOwner(user, client) {
 }
 
 import dropsManager from "../lib/drops.js";
+import resetNotifier from "../lib/pullResetNotifier.js";
 
 export async function execute(interactionOrMessage, client) {
   const isInteraction = typeof interactionOrMessage.isCommand === "function" || typeof interactionOrMessage.isChatInputCommand === "function";
@@ -86,7 +87,9 @@ export async function execute(interactionOrMessage, client) {
           "• `op owner give-money <amount> <@user>` — give money to user\n" +
           "• `op owner reset <@user>` — reset a user's data\n" +
           "• `op owner setdrops <#channel|off>` — set a channel where random cards are dropped every 5 minutes (first drop sent immediately)\n" +
-          "• `op owner unsetdrops` — disable drops for this server\n\n" +
+          "• `op owner unsetdrops` — disable drops for this server\n" +
+          "• `op owner setreset <#channel|off>` — set a channel where the bot will post a message every global pull reset\n" +
+          "• `op owner unsetreset` — disable pull-reset notifications for this server\n\n" +
           "Usage: slash: `/owner owner <subcommand>` or message: `op owner <subcommand> ...`"
         )
         .setFooter({ text: `Requested by ${user.username}`, iconURL: user.displayAvatarURL() });
@@ -261,6 +264,51 @@ export async function execute(interactionOrMessage, client) {
     } catch (e) {
       console.error('setdrops error:', e);
       return channel.send('Error setting drops channel. See logs.');
+    }
+  }
+
+  // Message-only: setreset #channel | off
+  if (sub === "setreset") {
+    if (isInteraction) return interactionOrMessage.reply({ content: "This command is currently message-only. Use: `op owner setreset #channel` or `op owner setreset off`.", ephemeral: true });
+    const parts = interactionOrMessage._rawParts || interactionOrMessage.content.trim().split(/\s+/);
+    const arg = parts[3];
+    if (!channel || !channel.guild) return channel.send("This command must be run in a server/guild channel.");
+    const guildId = channel.guild.id;
+    if (!arg) return channel.send("Usage: `op owner setreset #channel` or `op owner setreset off`");
+    const token = arg;
+    if (["off", "disable", "none"].includes(token.toLowerCase())) {
+      await resetNotifier.clearResetChannel(client, guildId);
+      return channel.send("Pull-reset notifications disabled for this server.");
+    }
+    let chId = null;
+    const m2 = token.match(/^<#(\d+)>$/);
+    if (m2) chId = m2[1];
+    else if (/^\d+$/.test(token)) chId = token;
+    else {
+      const name = token.replace(/^#/, "");
+      const found = channel.guild.channels.cache.find(c => c.name === name);
+      if (found) chId = found.id;
+    }
+    if (!chId) return channel.send("Unable to resolve channel. Mention the channel like #channel or provide its ID.");
+    try {
+      await resetNotifier.setResetChannel(client, guildId, chId);
+      return channel.send(`Pull-reset notifications set to <#${chId}>.`);
+    } catch (e) {
+      console.error('setreset error:', e);
+      return channel.send('Error setting pull-reset channel. See logs.');
+    }
+  }
+
+  if (sub === "unsetreset") {
+    if (isInteraction) return interactionOrMessage.reply({ content: "This command is currently message-only. Use: `op owner unsetreset`.", ephemeral: true });
+    if (!channel || !channel.guild) return channel.send("This command must be run in a server/guild channel.");
+    const guildId = channel.guild.id;
+    try {
+      await resetNotifier.clearResetChannel(client, guildId);
+      return channel.send("Pull-reset notifications disabled for this server.");
+    } catch (e) {
+      console.error('unsetreset error:', e);
+      return channel.send('Error disabling pull-reset notifications. See logs.');
     }
   }
 

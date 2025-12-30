@@ -14,7 +14,14 @@ const SHOP = {
     steel: 500, iron: 500, wood: 500, leather: 500, "ray skin": 500, titanium: 500, obsidian: 500, spring: 500, aluminum: 500, brass: 500, diamond: 1000
   },
   legendary: {
-    "log pose": 5000, map: 3000, "gold bar": 10000, "jolly roger flag": 4000, "crew contract": 8000, "ancient relic": 12000, "s rank summon": 15000, awakening: 20000
+    "log pose": 25000,
+    "map of the world": 25000,
+    "diamond": 1000,
+    "jolly roger flag": 25000,
+    "summon": 50000,
+    "conquorors haki": 50000,
+    "observation haki": 30000,
+    "armament haki": 30000
   },
   others: {
     "reset token": 800, "xp book": 500, "xp scroll": 60, "battle token": 60
@@ -124,9 +131,35 @@ export async function execute(interactionOrMessage) {
       bal2.resetTokens = (bal2.resetTokens || 0) + amount;
       await bal2.save();
     } else {
+      // Use case-insensitive item storage to avoid duplicates
       const items = inv.items instanceof Map ? inv.items : new Map(Object.entries(inv.items || {}));
-      const prev = Number(items.get(key) || 0);
-      items.set(key, prev + amount);
+      const storageKey = key;
+      
+      // Find existing key case-insensitively to avoid duplicates
+      let foundKey = null;
+      if (typeof items.get === 'function') {
+        for (const k of items.keys()) {
+          if (String(k).toLowerCase() === storageKey) {
+            foundKey = k;
+            break;
+          }
+        }
+      } else {
+        for (const k of Object.keys(items || {})) {
+          if (String(k).toLowerCase() === storageKey) {
+            foundKey = k;
+            break;
+          }
+        }
+      }
+      
+      const useKey = foundKey || storageKey;
+      const prev = Number(items.get ? items.get(useKey) : items[useKey] || 0);
+      if (items.set) {
+        items.set(useKey, prev + amount);
+      } else {
+        items[useKey] = prev + amount;
+      }
       inv.items = items;
     }
   }

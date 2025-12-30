@@ -97,15 +97,50 @@ export async function execute(interactionOrMessage) {
     console.error("Failed to fetch balance for timers:", e);
   }
 
-  const header = `Here are all the important bot timers!\n\n`;
-  const text = header +
-    `**daily quests:** ${lines.find(l => l.startsWith('• Daily quests')) ? '\n' + lines.filter(l => l.startsWith('• Daily quests')).join('\n') : '\nNo data'}\n\n` +
-    `**weekly quests:** ${lines.find(l => l.startsWith('• Weekly quests')) ? '\n' + lines.filter(l => l.startsWith('• Weekly quests')).join('\n') : '\nNo data'}\n\n` +
-    `**pulls:** ${lines.find(l => l.startsWith('• Pulls')) ? '\n' + lines.filter(l => l.startsWith('• Pulls')).join('\n') : '\nNo data'}\n\n` +
-    `**mission:** ${lines.find(l => l.includes('Mission')) ? '\n' + lines.filter(l => l.includes('Mission')).join('\n') : '\nNo data'}\n\n` +
-    `**gambling:** ${lines.find(l => l.includes('Gambling')) ? '\n' + lines.filter(l => l.includes('Gambling')).join('\n') : '\nNo data'}\n\n` +
-    `**duel xp:** ${lines.find(l => l.includes('Duel XP')) ? '\n' + lines.filter(l => l.includes('Duel XP')).join('\n') : '\nNo data'}\n\n` +
-    `**daily rewards:** ${lines.find(l => l.includes('Daily available') || l.includes('Daily:')) ? '\n' + lines.filter(l => l.includes('Daily available') || l.includes('Daily:')).join('\n') : '\nNo data'}\n`;
+  // Format timer output with minimal spacing
+  const dailyQuestLine = lines.find(l => l.startsWith('• Daily quests'));
+  const weeklyQuestLine = lines.find(l => l.startsWith('• Weekly quests'));
+  const pullLine = lines.find(l => l.startsWith('• Pulls'));
+  const missionLine = lines.find(l => l.startsWith('• Mission'));
+  const gamblingLine = lines.find(l => l.startsWith('• Gambling'));
+  const dailyLine = lines.find(l => l.startsWith('• Daily available') || l.startsWith('• Daily:'));
+
+  // Extract time values from lines
+  const extractTime = (line) => {
+    const match = line ? line.match(/in: (.+?)(?:\s*•|$)/) : null;
+    if (match) return match[1];
+    // If line says "available now", return "0s"
+    if (line && line.includes('available now')) return '0s';
+    return 'resetting soon';
+  };
+
+  const extractGamblingCount = (line) => {
+    const match = line ? line.match(/Gambles today: (\d+\/\d+)/) : null;
+    return match ? match[1] : '0/10';
+  };
+
+  const extractDailyCount = (line) => {
+    const match = line ? line.match(/Streak: (\d+\/\d+)/) : null;
+    return match ? match[1] : '0/5';
+  };
+
+  const dailyQuestTime = extractTime(dailyQuestLine);
+  const weeklyQuestTime = extractTime(weeklyQuestLine);
+  const pullTime = extractTime(pullLine);
+  const missionTime = extractTime(missionLine);
+  const gamblingTime = extractTime(gamblingLine);
+  const gamblingCount = extractGamblingCount(gamblingLine);
+  const dailyTime = extractTime(dailyLine);
+  const dailyCount = extractDailyCount(dailyLine);
+
+  const header = `Here are all the bot timers!`;
+  const text = `${header}
+**Daily quests:** resets in \`${dailyQuestTime}\`
+**Weekly quests:** resets in \`${weeklyQuestTime}\`
+**Pulls:** resets in \`${pullTime}\`
+**Missions:** resets in \`${missionTime}\`
+**Gambling:** resets in \`${gamblingTime}\`. ${gamblingCount}
+**Daily rewards:** available in \`${dailyTime}\`. ${dailyCount}`;
 
   if (isInteraction) return interactionOrMessage.reply({ content: text });
   return channel.send({ content: text });
