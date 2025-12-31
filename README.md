@@ -34,12 +34,7 @@ ALL of the above
 
 ## Deploy to Render (24/7) ✅
 
-- Create a **Web Service** on Render and connect your GitHub repository.
-- In Render, set the environment variables: `TOKEN`, `MONGO_URI`, `CLIENT_ID`, `OWNER_ID`, etc. **Do not** commit your `.env` to the repo.
 
-- Render runs the service and provides a public URL. The bot listens on `process.env.PORT` so Render's port routing works automatically.
-- The app exposes a lightweight health endpoint: `GET /`, `GET /health` and `GET /_health` which return HTTP 200 `OK`.
-- Use UptimeRobot to ping your Render service URL (e.g., `https://your-service.onrender.com/health`) every 5 minutes to keep it continuously running.
 
 Note: If your host requires binding to a specific fixed port, you can set `DUMMY_PORT=3000` (default) and the app will attempt to start an additional dummy server on that port. The dummy server is optional and will not crash the app if the port is in use.
 Local testing:
@@ -49,8 +44,30 @@ PORT=3000 node index.js
 curl http://localhost:3000/health
 ```
 
----
 
+## Bot Overview
+
+- **Type:** English-language Discord game bot focused on collectible cards, pulls, duels, and player progression. Designed to run as either a full gateway bot (What I want) or an interactions-only webhook for hosts that block WebSocket egress.
+
+- **Features:** Collectible card pulls, inventory and collection management, PvP duels, shop/purchases, daily rewards, quests and missions, crafting/upgrading, leaderboards and stats tracking.
+
+- **Commands:** Slash commands and legacy message commands are implemented. See the `commands/` directory for a command-by-command implementation. Use the included `deploy-commands.js` script to register slash commands.
+
+- **Permissions & Intents:** Requires basic bot scopes and these intents when using the gateway: `Guilds`, `GuildMessages`, `MessageContent`. For slash-commands-only mode, no Message Content intent is required; instead ensure `DISCORD_PUBLIC_KEY` and the `/interactions` endpoint are configured.
+
+- **Database:** Uses MongoDB for persistent storage. The `models/` folder contains schema-like models (`Inventory`, `Balance`, `Pull`, `Quest`, etc.). Provide `MONGO_URI` as an environment variable. The DB stores user inventories, balances, pulls history, quests and other persistent game state.
+
+- **Dashboard:** No built-in web dashboard in this repo. The codebase is structured so an external dashboard can interact with the bot via the database (read/write) or by calling custom APIs you add (or by sending Discord REST requests using the bot token).
+
+- **APIs & Endpoints:** Exposes lightweight health endpoints: `GET /`, `GET /health`, `GET /_health`. If running in interactions/webhook mode, the app accepts `POST /interactions` for Discord interaction payloads. You can add custom HTTP routes in `server.js` or `index.js` as needed.
+
+- **Scale & Architecture:** The application is mostly stateless outside of the MongoDB database. Horizontal scaling is supported for interactions and API endpoints. If you run the Discord gateway (WebSocket) you should be aware of session limits and identify whether you need a single gateway instance or sharding for larger guild counts. For web-only operation (interactions), the service is easy to scale behind a load balancer.
+
+- **Logging & Monitoring:** The app logs to stdout/stderr for host collection. For production use, forward logs to an external log provider (Papertrail, Logflare, Datadog). Add process monitoring (PM2, Docker restart policies) and uptime checks (UptimeRobot) for extra reliability.
+
+- **Secrets & Environment:** Keep secrets out of the repo. Required environment variables include `TOKEN`, `MONGO_URI`, , `CLIENT_ID`, and administrative IDs like `OWNER_ID`.
+
+If you'd like, I can expand any of these sections into more detailed operational docs (example `docker-compose`, a monitoring guide, or a simple dashboard sketch).
 If you'd like, I can add a `Procfile`, a `render.yaml` template, or step-by-step instructions for creating the Render service.
 
 ---
