@@ -178,7 +178,7 @@ export async function execute(interactionOrMessage, client) {
     if (d < bestDiff) { bestDiff = d; chosenColor = r.color; }
   }
 
-  // Ensure we have a proper Discord `User` to read username/avatar from
+  // Ensure we have a proper Discord `User` for both target and requester
   let displayUser = user;
   try {
     if (!displayUser || typeof displayUser.displayAvatarURL !== "function" || !displayUser.username) {
@@ -191,10 +191,20 @@ export async function execute(interactionOrMessage, client) {
   const displayName = (displayUser && displayUser.username) ? displayUser.username : (user && user.username) ? user.username : `User ${userId}`;
   const avatarURL = (displayUser && typeof displayUser.displayAvatarURL === "function") ? displayUser.displayAvatarURL() : null;
 
+  // Fetch requester user if needed
+  let requesterUser = isInteraction ? interactionOrMessage.user : interactionOrMessage.author;
+  try {
+    if (!requesterUser || typeof requesterUser.displayAvatarURL !== "function") {
+      requesterUser = await client.users.fetch(requesterUser.id).catch(() => requesterUser);
+    }
+  } catch (e) {
+    // keep as is
+  }
+
   const embed = new EmbedBuilder()
     .setTitle(`${displayName}'s Team`)
     .setColor(chosenColor)
-    .setFooter({ text: `Requested by ${displayName}`, iconURL: avatarURL });
+    .setFooter({ text: `Requested by ${requesterUser.username}`, iconURL: requesterUser.displayAvatarURL ? requesterUser.displayAvatarURL() : null });
 
   if (!teamIds.length) {
     embed.setDescription("No team set. Use `op team add <card>` or `/team add <card>`.");

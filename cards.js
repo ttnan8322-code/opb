@@ -2289,7 +2289,7 @@ export const cards = [
   { id: "Richie_b_01", name: "Richie", title: "Member of the Buggy pirates", rank: "B", power: 48, attackRange: [10, 22], health: 118, type: "Attack", ability: null, image: "https://files.catbox.moe/q8yru9.webp" },
   { id: "Richie_c_02", name: "Richie", title: "Member of the Buggy pirates", rank: "C", power: 20, attackRange: [4, 12], health: 72, type: "Attack", ability: null, image: "https://files.catbox.moe/k1gdg7.webp" },
   { id: "cabaji_b_01", name: "cabaji", title: "Member of the Buggy pirates", rank: "B", power: 46, attackRange: [9, 20], health: 110, type: "Attack", ability: null, image: "https://files.catbox.moe/a7os02.webp" },
-  { id: "cabaji_b_02", name: "cabaji", title: "Member of the Buggy pirates", rank: "B", power: 47, attackRange: [9, 21], health: 112, type: "Attack", ability: null, image: "https://files.catbox.moe/chufol.webp" },
+  { id: "cabaji_b_02", name: "cabaji", title: "Member of the Buggy pirates", rank: "B", power: 47, attackRange: [9, 21], health: 112, type: "Attack", ability: null, image: "https://files.catbox.moe/chufol.webp", isUpgrade: true, upgradeRequirements: { cost: 1000, minLevel: 10 } },
   { id: "TighttropeWalkingFunanBros_c_01", name: "Tighttrope Walking Funan Bros", title: "Member of the Buggy pirates", rank: "C", power: 18, attackRange: [3, 9], health: 64, type: "Support", ability: "Boosts team HP by 10%",
     boost: { hp: 10 }, image: "https://files.catbox.moe/1ez338.webp" },
   { id: "SuperhumanDomingos_c_01", name: "Superhuman Domingos", title: "Member of the Buggy pirates", rank: "C", power: 19, attackRange: [3, 9], health: 68, type: "Attack", ability: null, image: "https://files.catbox.moe/ckavv9.webp" },

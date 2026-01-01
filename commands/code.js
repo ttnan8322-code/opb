@@ -73,19 +73,30 @@ export async function execute(interactionOrMessage) {
 
   // Apply rewards
   // 10 C, 5 B, 3 A, 1 S chests
-  let bal = await Balance.findOne({ userId });
-  if (!bal) bal = new Balance({ userId, amount: 0 });
-  bal.amount = (bal.amount || 0) + 5000;
-  await bal.save();
+  await Balance.findOneAndUpdate(
+    { userId },
+    { $inc: { amount: 5000 } },
+    { upsert: true }
+  );
 
-  let inv = await Inventory.findOne({ userId });
-  if (!inv) inv = new Inventory({ userId, items: {}, chests: { C:0,B:0,A:0,S:0 }, xpBottles:0 });
-  inv.chests = inv.chests || { C:0,B:0,A:0,S:0 };
-  inv.chests.C = (inv.chests.C || 0) + 10;
-  inv.chests.B = (inv.chests.B || 0) + 5;
-  inv.chests.A = (inv.chests.A || 0) + 3;
-  inv.chests.S = (inv.chests.S || 0) + 1;
-  await inv.save();
+  await Inventory.findOneAndUpdate(
+    { userId },
+    {
+      $inc: {
+        'chests.C': 10,
+        'chests.B': 5,
+        'chests.A': 3,
+        'chests.S': 1
+      },
+      $setOnInsert: {
+        items: {},
+        xpBottles: 0,
+        xpScrolls: 0,
+        xpBooks: 0
+      }
+    },
+    { upsert: true }
+  );
 
   // Give new card
   const cardId = 'luffy_z_newyears_2026';
