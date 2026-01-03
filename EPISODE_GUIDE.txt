@@ -1,0 +1,120 @@
+Episode Embed & Sail Flow Guide
+
+Purpose
+- Describe how to build episode embeds, XP awarding rules, reward conversion for duplicates, button customIds, and progression checks used in the sailing/story system.
+
+Files of interest
+- events/interactionCreate.js — interaction handler and sail flow (battle helpers at module scope)
+- commands/sail.js — slash command that shows the current sail progress / episode intro
+- models/SailProgress.js — per-user sail progress and awardedXp tracking
+- models/Progress.js — player collection and team data
+
+Episode embed construction
+- Title: Use bold formatting for episode name/number. Example: `**Episode Title — Episode N**`.
+- Description: Provide a short narrative, then a `**Possible rewards:**` section listing money, chests, card rewards and special-case items.
+- Image: Use `.setImage(url)` to display a banner for the episode.
+- XP line: Always compute and inject an `xpAmount` variable before building the embed. Use consistent difficulty mapping:
+  - easy: 10 XP
+  - medium: 20 XP
+  - hard: 30 XP
+  - Always use the canonical mapping above for standard episodes. Do not apply ad-hoc higher values for specific episodes unless intentionally documented and implemented in code.
+
+XP awarding rules
+- XP is awarded to the user (progress.userXp) and each card in the active team.
+- Each card's leveling uses a flat 100 XP per level rule in this implementation.
+- When awarding XP to user and cards:
+  1. Add xpAmount.
+  2. While total XP >= 100, subtract 100 and increment level.
+  3. Persist changes by saving the `Progress` document and marking `cards` modified when appropriate.
+- `SailProgress.awardedXp` is used to avoid awarding the same XP more than once per episode/difficulty. Track with keys like `ep2_hard` or difficulty names.
+
+Duplicate reward conversion
+- When a card reward is given from sailing and the player already owns the card, convert the duplicate into 100 XP (not an extra card object). This 100 XP is applied to the existing card's XP and may cause level-ups per the usual 100 XP per level rule.
+- Implementation details:
+  - Ensure `progress.cards` is a `Map` (or converted to one) for `.get`/`.set` usage.
+  - On reward: if `progress.cards.has(cardId)`, add 100 to `entry.xp` and roll level-ups accordingly.
+  - If not owned, set `{ level: 1, xp: 0, count: 1 }`.
+  - Provide a human-readable `rewardsText` that marks duplicates (strike-through) and explains conversion to XP.
+
+- Battle/session flow and enemies
+- Battles are tracked in `global.SAIL_SESSIONS` keyed by a session id like `sail_<userId>_<timestamp>`.
+- `startSailTurn(sessionId, channel)` drives the turn UI and enemy progression.
+- Enemy selection is episode-aware. For example:
+  - Episode 1 progression uses `Poppoko` -> `Alvida` (legacy behavior).
+  - Episode 2 progression should use `Helmeppo` -> `Marine` (no accidental Popokko/Alvida presence).
+- After replacing enemies, apply a difficulty multiplier to stats: easy=1, medium=1.25, hard=1.5.
+- After replacing enemies, apply a difficulty multiplier to stats: easy=1, medium=1.25, hard=1.5.
+
+Map display rules
+- The `/map` command shows the world map with per-island and per-episode progress.
+- Islands are defined with episode ranges (example configuration in code):
+  - Goat Island: episode 1
+  - Shells Town: episodes 2-3
+  - Orange Town: episodes 4-8
+  - Syrup Village: episodes 9-18
+  - Baratie: episodes 19-30
+  - Arlong Park: episodes 31-44
+  - Loguetown: episodes 45-53
+  - Warship Island: episodes 54-61 (this island is displayed but excluded from the East Blue total tally)
+- Display rules:
+  - The top-level `East Blue` line shows the sum of stars for all East Blue islands except any islands explicitly marked `excludeFromEastBlue` (e.g., Warship Island).
+  - The East Blue progress bar is an 8-segment bar computed from total stars / max stars.
+  - Each island displays its own `?/? ✭` total on the same line, followed by an 8-segment progress bar on its own line.
+  - Below each island bar, list every episode on its own line. For each episode:
+    - If the episode is not yet reached (episode number > `SailProgress.progress`) show a lock `⛓` next to it.
+    - If the episode has been completed (episode number < `SailProgress.progress`) show the earned stars as `x/3 ✭`.
+    - If the episode is the currently unlocked one (episode number === `SailProgress.progress`), show the episode name with no icon (available to start).
+  - Include simple `Back` / `Next` navigation buttons on the map (UI-only; handlers can be implemented later).
+
+Buttons / customId formats
+- `sail:<userId>:sail` — used for the main sail action (progress/unlock). NOTE: do not auto-advance to a later episode via this button; require completing the prior episode's battle.
+- `sail:<userId>:map` — open the map/menu for sailing.
+- `sail_battle:<userId>:ready` — start Episode 1 battle (use existing team)
+- `sail_battle_ep2:<userId>:start` — start Episode 2 battle
+- `sail_battle_ep3:<userId>:start` — start Episode 3 battle (same flow as other sail_battle handlers)
+- `sail_selectchar:<sessionId>:<cardIndex>` — select a card to act in battle
+- `sail_chooseaction:<sessionId>:<action>:<cardIndex>` — choose attack / special etc.
+- `sail_selecttarget:<sessionId>:<targetIndex>` — target an enemy
+- `sail_heal:<sessionId>` and `sail_heal_item:<sessionId>:<itemId>` — heal actions
+- `map_nav:<back|next>:<userId>` — map pagination buttons (client-side UI only)
+
+Progression rules
+- `SailProgress.progress` indicates the next unlocked episode index:
+  - 0 = none (intro)
+  - 1 = episode 1 unlocked but not completed
+  - 2 = episode 1 completed, episode 2 unlocked
+  - 3 = episode 2 completed, episode 3 unlocked
+- Do not advance `sailProgress.progress` to the next episode until `endSailBattle(..., true)` sets the next progress value.
+- When an embed/button would otherwise increment progress (legacy code), replace it with an instructional message requiring the player to complete the battle first.
+- Important: when a user runs `/sail` and `sailProgress.progress` points to a newly unlocked episode (for example, the player completed Episode 2 and `progress === 3`), the command should present the episode intro embed (with XP, rewards and Sail-start button) instead of returning a short string like `Your current sail progress: Episode X`. Avoid sending terse progress-only replies in this case so players can immediately see the episode content and start the next battle.
+
+Persistence notes
+- Some older stored documents may have `cards` as plain objects. Convert with `new Map(Object.entries(cardsObj || {}))` when reading, and save as needed.
+- Use `progress.markModified('cards')` before saving if Mongoose cannot detect nested Map changes.
+
+Testing checklist
+- Start with a fresh user and walk the sail flow:
+  1. `/sail` -> select difficulty -> click `Sail` -> Episode 1 embed appears with bold title and XP shown.
+  2. Click `I'm ready!` -> start battle -> defeat enemies -> confirm rewards: duplicate card converts to +1 level and `rewardsText` explains conversion.
+  3. After victory, ensure `SailProgress.progress` increments and Episode 2 embed is available.
+  4. Confirm Episode 2 enemies are Helmeppo/Marine and not Poppoko/Alvida.
+
+Maintenance
+- Keep embed titles consistent. Compute dynamic values (xpAmount, reward lists) in code and avoid relying on templated strings without variable definition.
+- When adding new episodes, follow the same construction pattern: compute XP, compose bold title, list rewards, add `sail_battle` buttons for starting battles, and register episode-specific enemy progression in `startSailTurn`.
+ - When adding new episodes, follow the same construction pattern: compute XP, compose bold title, list rewards, add `sail_battle` buttons for starting battles, and register episode-specific enemy progression in `startSailTurn`.
+
+Phase initialization rule
+- If a `startEpisodeXStageY` helper spawns the first wave of enemies immediately (for example, Episode 2 starts with Helmeppo already present, Episode 3 starts with the three Marines), set the session's `phase` to the *next* numeric phase so the `startSailTurn` progression logic advances to the following encounter rather than re-spawning the same wave. Example: when you set `enemies` to Helmeppo in `startEpisode2Stage2`, initialize `phase: 2` so the next spawn is the Marines instead of Helmeppo being spawned again.
+
+Episode 3 rewards
+- Episode 3 should have its own reward branch in `endSailBattle` (do not fall into the generic else branch). Episode 3 rewards include:
+  - 250-500 beli
+  - 1-2 C chests
+  - `1 B` chest and `axehandmorgan_b_01` (Axe-Hand Morgan) when cleared on `hard` difficulty
+  - `reset token`: awarded only on `hard` difficulty for Episode 3
+
+Make sure `endSailBattle` checks `session.episode === 3` before the generic else branch so Episode 3 rewards are applied correctly.
+
+Contact
+- For clarifications or changes to reward conversions (e.g. convert to XP instead of level), update the conversion block in `events/interactionCreate.js` and document the change here.

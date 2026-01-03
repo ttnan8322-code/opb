@@ -18,6 +18,20 @@ export async function execute(interactionOrMessage) {
   const progress = await Progress.findOne({ userId });
   const sailProgress = await SailProgress.findOne({ userId }) || new SailProgress({ userId });
 
+  // enforce cooldown after defeat: 5 minutes
+  if (sailProgress && sailProgress.lastSail) {
+    try {
+      const last = new Date(sailProgress.lastSail).getTime();
+      const diff = Date.now() - last;
+      const cooldown = 5 * 60 * 1000;
+      if (diff < cooldown) {
+        const remaining = Math.ceil((cooldown - diff) / 1000);
+        if (isInteraction) return interactionOrMessage.reply({ content: `You are on cooldown after defeat. Please wait ${remaining} seconds before sailing again.`, ephemeral: true });
+        return channel.send(`You are on cooldown after defeat. Please wait ${remaining} seconds before sailing again.`);
+      }
+    } catch (e) { /* ignore parse errors */ }
+  }
+
   const teamSet = progress && progress.team && progress.team.length > 0;
   const teamNames = teamSet ? progress.team.map(id => {
     const card = getCardById(id);
@@ -123,9 +137,8 @@ I'm Luffy! The Man Who Will Become the Pirate King!`)
         let entry = progress.cards.get(cardId) || { count: 0, xp: 0, level: 0 };
         if (!entry.count) entry.count = 1;
         // This ensures we don't lose existing level when adding xp
-        if (entry.level && (!entry.xp || entry.xp === 0)) {
-          entry.xp = entry.level * 100;
-        }
+        // Keep xp as remainder (0-99) so awarding is constant per difficulty
+        entry.xp = entry.xp || 0;
         // Each level is always 100 XP (flat, not increasing)
         let totalXp = (entry.xp || 0) + xpAmount;
         let newLevel = entry.level || 0;
@@ -144,7 +157,7 @@ I'm Luffy! The Man Who Will Become the Pirate King!`)
       sailProgress.awardedXp[sailProgress.difficulty] = true;
       await sailProgress.save();
     } else {
-      xpAmount = sailProgress.difficulty === 'hard' ? 30 : sailProgress.difficulty === 'normal' ? 20 : 10;
+      xpAmount = sailProgress.difficulty === 'hard' ? 30 : sailProgress.difficulty === 'medium' ? 20 : 10;
     }
 
     const embed = new EmbedBuilder()
@@ -166,10 +179,6 @@ Luffy is found floating at sea by a cruise ship. After repelling an invasion by 
           .setCustomId(`sail_battle:${userId}:ready`)
           .setLabel("I'm ready!")
           .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-          .setCustomId(`sail:${userId}:sail`)
-          .setLabel('Sail to Episode 2')
-          .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
           .setCustomId(`sail:${userId}:map`)
           .setLabel('Map')
@@ -195,7 +204,8 @@ Luffy is found floating at sea by a cruise ship. After repelling an invasion by 
     }
     let xpAmount = 0;
     if (!sailProgress.awardedXp[`ep2_${sailProgress.difficulty}`]) {
-      xpAmount = sailProgress.difficulty === 'hard' ? 40 : sailProgress.difficulty === 'medium' ? 30 : 20;
+      // Use the same constant mapping for Episode 2 as other episodes
+      xpAmount = sailProgress.difficulty === 'hard' ? 30 : sailProgress.difficulty === 'medium' ? 20 : 10;
       // award to user xp and handle user level
       progress.userXp = (progress.userXp || 0) + xpAmount;
       let levelsGained = 0;
@@ -230,9 +240,8 @@ Luffy is found floating at sea by a cruise ship. After repelling an invasion by 
         let entry = progress.cards.get(cardId) || { count: 0, xp: 0, level: 0 };
         if (!entry.count) entry.count = 1;
         // This ensures we don't lose existing level when adding xp
-        if (entry.level && (!entry.xp || entry.xp === 0)) {
-          entry.xp = entry.level * 100;
-        }
+        // Keep xp as remainder (0-99) so awarding is constant per difficulty
+        entry.xp = entry.xp || 0;
         // Each level is always 100 XP (flat, not increasing)
         let totalXp = (entry.xp || 0) + xpAmount;
         let newLevel = entry.level || 0;
@@ -251,7 +260,7 @@ Luffy is found floating at sea by a cruise ship. After repelling an invasion by 
       sailProgress.awardedXp[`ep2_${sailProgress.difficulty}`] = true;
       await sailProgress.save();
     } else {
-      xpAmount = sailProgress.difficulty === 'hard' ? 40 : sailProgress.difficulty === 'medium' ? 30 : 20;
+      xpAmount = sailProgress.difficulty === 'hard' ? 30 : sailProgress.difficulty === 'medium' ? 20 : 10;
     }
 
     const embed = new EmbedBuilder()
@@ -288,11 +297,97 @@ Luffy and Koby find Zoro captured in Shells Town's Marine base, with the Marines
     } else {
       await channel.send({ embeds: [embed], components: [buttons] });
     }
+  } else if (sailProgress.progress === 3) {
+    // Episode 3: Intro
+    let progressDoc = await Progress.findOne({ userId });
+    if (!progressDoc) progressDoc = new Progress({ userId, team: [], cards: new Map() });
+    if (!progressDoc.cards || typeof progressDoc.cards.get !== 'function') {
+      progressDoc.cards = new Map(Object.entries(progressDoc.cards || {}));
+    }
+
+    let xpAmount = 0;
+    if (!sailProgress.awardedXp[`ep3_${sailProgress.difficulty}`]) {
+      xpAmount = sailProgress.difficulty === 'hard' ? 30 : sailProgress.difficulty === 'medium' ? 20 : 10;
+      // award xp to user and team cards (same pattern as other episodes)
+      progressDoc.userXp = (progressDoc.userXp || 0) + xpAmount;
+      let levelsGained = 0;
+      while (progressDoc.userXp >= 100) {
+        progressDoc.userXp -= 100;
+        progressDoc.userLevel = (progressDoc.userLevel || 1) + 1;
+        levelsGained++;
+      }
+      if (levelsGained > 0) {
+        const balance = await Balance.findOne({ userId }) || new Balance({ userId });
+        const inventory = await Inventory.findOne({ userId }) || new Inventory({ userId });
+        let oldLevel = progressDoc.userLevel - levelsGained;
+        for (let lvl = oldLevel + 1; lvl <= progressDoc.userLevel; lvl++) {
+          balance.balance += lvl * 50;
+          const rankIndex = Math.floor((lvl - 1) / 10);
+          const ranks = ['C', 'B', 'A', 'S'];
+          const currentRank = ranks[rankIndex] || 'S';
+          const prevRank = ranks[rankIndex - 1];
+          const chance = (lvl % 10 || 10) * 10;
+          if (Math.random() * 100 < chance) {
+            inventory.chests[currentRank] += 1;
+          } else if (prevRank) {
+            inventory.chests[prevRank] += 1;
+          }
+        }
+        await balance.save();
+        await inventory.save();
+      }
+      // award xp to team cards
+      for (const cardId of progressDoc.team || []) {
+        let entry = progressDoc.cards.get(cardId) || { count: 0, xp: 0, level: 0 };
+        if (!entry.count) entry.count = 1;
+        entry.xp = entry.xp || 0;
+        let totalXp = (entry.xp || 0) + xpAmount;
+        let newLevel = entry.level || 0;
+        while (totalXp >= 100) {
+          totalXp -= 100;
+          newLevel += 1;
+        }
+        entry.xp = totalXp;
+        entry.level = newLevel;
+        progressDoc.cards.set(cardId, entry);
+        progressDoc.markModified('cards');
+      }
+      await progressDoc.save();
+      sailProgress.awardedXp = sailProgress.awardedXp || {};
+      sailProgress.awardedXp[`ep3_${sailProgress.difficulty}`] = true;
+      await sailProgress.save();
+    } else {
+      xpAmount = sailProgress.difficulty === 'hard' ? 40 : sailProgress.difficulty === 'medium' ? 30 : 20;
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor('Blue')
+      .setTitle("Morgan vs. Luffy! Who's This Mysterious Beautiful Young Girl? - Episode 3")
+      .setDescription(`Luffy and Zoro battle and defeat Morgan, Helmeppo and the Marines. Koby parts ways with Luffy to join the Marines, and Zoro joins Luffy's crew as a permanent crew member.\n\n**Possible rewards:**\n250 - 500 beli\n1 - 2 C chest\n1 B chest (Hard mode exclusive)\n1x Axe-hand Morgan card (Hard mode exclusive)\n\n*XP awarded: +${xpAmount} to user and each team card.*`)
+      .setImage('https://files.catbox.moe/8os33p.webp');
+
+    const buttons = new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(`sail_battle_ep3:${userId}:start`)
+          .setLabel('Sail to Episode 3')
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId(`sail:${userId}:map`)
+          .setLabel('Map')
+          .setStyle(ButtonStyle.Secondary)
+      );
+
+    if (isInteraction) {
+      await interactionOrMessage.reply({ embeds: [embed], components: [buttons] });
+    } else {
+      await channel.send({ embeds: [embed], components: [buttons] });
+    }
   } else {
-    // For now, just reply with current progress
+    // Default: show a helpful progress message rather than a terse string
     const reply = `Your current sail progress: Episode ${sailProgress.progress}`;
     if (isInteraction) {
-      await interactionOrMessage.reply({ content: reply });
+      await interactionOrMessage.reply({ content: reply, ephemeral: true });
     } else {
       await channel.send(reply);
     }

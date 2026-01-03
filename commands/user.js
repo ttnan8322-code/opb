@@ -106,7 +106,7 @@ export async function execute(interactionOrMessage, client){
   const xpToNext = 100 - (xp % 100 || 0);
   const bar = progressBar(xp % 100, 100, 20);
   const karma = (prog && (prog.karma || 0)) || 0;
-  const karmaDisplay = karma <= 0 ? 'No Karma' : `${karma}/100 Karma`;
+  const karmaDisplay = String(karma);
 
   const wealth = (bal && (bal.balance || bal.amount)) || 0;
   const higher = await Balance.countDocuments({ $or: [{ amount: { $gt: wealth } }, { balance: { $gt: wealth } }] });
@@ -152,9 +152,9 @@ export async function execute(interactionOrMessage, client){
     .setDescription(
       rewardMessage +
       `Level ${level} • XP to next: ${xpToNext}\n${bar}\n` +
-      `**Karma:** ${karmaDisplay}\n\n` +
       `**Wealth:** ${fmtNumber(wealth)}¥\n` +
       `**Global ranking:** #${globalRank}\n\n` +
+      `**Karma:** ${karmaDisplay}\n\n` +
       `**statistics:**\n` +
       `total pulls: ${fmtNumber(totalPulls)}\n` +
       `Unique Cards: ${uniqueCards}/${cards.length}`

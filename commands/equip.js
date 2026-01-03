@@ -74,10 +74,93 @@ export async function execute(interactionOrMessage, client) {
 
   // Find weapon
   const weapon = getWeaponById(weaponQuery);
-  if (!weapon) {
+  // If not a weapon/banner, check for Haki equip (armament/observation/conqueror)
+  const hakiNames = ['armament', 'observation', 'conqueror'];
+  const qLower = String(weaponQuery || '').toLowerCase();
+  const isHakiEquip = hakiNames.includes(qLower) || hakiNames.map(h=>`advanced${h}`).includes(qLower);
+  if (!weapon && !isHakiEquip) {
     const reply = `You don't own **${weaponQuery}** or it doesn't exist.`;
     if (isInteraction) await interactionOrMessage.reply({ content: reply, ephemeral: true });
     else await interactionOrMessage.channel.send(reply);
+    return;
+  }
+
+  // Handle Haki equip flow
+  if (isHakiEquip) {
+    // require a target card
+    if (!cardQuery) {
+      const reply = `Usage: op equip <haki-type> <card> — e.g. op equip armament Luffy`;
+      if (isInteraction) await interactionOrMessage.reply({ content: reply, ephemeral: true }); else await channel.send(reply);
+      return;
+    }
+
+    // Resolve card
+    const card = getCardByQuery(cardQuery);
+    if (!card) {
+      const reply = `No card matching "${cardQuery}" found.`;
+      if (isInteraction) await interactionOrMessage.reply({ content: reply, ephemeral: true }); else await channel.send(reply);
+      return;
+    }
+
+    // Verify card supports that haki
+    const { parseHaki } = await import('../lib/haki.js');
+    const cardHaki = parseHaki(card);
+    const hakiKey = qLower.replace(/^advanced/, '');
+    if (!cardHaki[hakiKey] || !cardHaki[hakiKey].present) {
+      const reply = `${card.name} does not support ${hakiKey} Haki.`;
+      if (isInteraction) await interactionOrMessage.reply({ content: reply, ephemeral: true }); else await channel.send(reply);
+      return;
+    }
+
+    // Check inventory for a matching haki item key
+    const Inventory = await import('../models/Inventory.js');
+    const invDoc = await Inventory.default.findOne({ userId });
+    if (!invDoc) {
+      const reply = `You don't have any items to apply.`;
+      if (isInteraction) await interactionOrMessage.reply({ content: reply, ephemeral: true }); else await channel.send(reply);
+      return;
+    }
+
+    const items = invDoc.items instanceof Map ? Object.fromEntries(invDoc.items) : (invDoc.items || {});
+    // possible item keys: haki_armament, haki_observation, haki_conqueror
+    const itemKey = `haki_${hakiKey}`;
+    const itemCount = Number(items[itemKey] || 0);
+    if (itemCount <= 0) {
+      const reply = `You don't have any ${hakiKey} Haki items to apply.`;
+      if (isInteraction) await interactionOrMessage.reply({ content: reply, ephemeral: true }); else await channel.send(reply);
+      return;
+    }
+
+    // Deduct item and apply star to user's Progress entry
+    const Progress = await import('../models/Progress.js');
+    const prog = await Progress.default.findOne({ userId });
+    if (!prog) {
+      const reply = `You don't have any progress record.`;
+      if (isInteraction) await interactionOrMessage.reply({ content: reply, ephemeral: true }); else await channel.send(reply);
+      return;
+    }
+
+    // normalize map storage
+    if (!prog.cards || typeof prog.cards.get !== 'function') prog.cards = new Map(Object.entries(prog.cards || {}));
+    const owned = prog.cards.get(card.id) || { level: 0, xp: 0, count: 0 };
+    owned.haki = owned.haki || { armament: 0, observation: 0, conqueror: 0 };
+    owned.haki[hakiKey] = (owned.haki[hakiKey] || 0) + 1;
+    prog.cards.set(card.id, owned);
+
+    // remove one item from inventory
+    if (invDoc.items instanceof Map) {
+      const cur = invDoc.items.get(itemKey) || 0;
+      invDoc.items.set(itemKey, Math.max(0, cur - 1));
+    } else {
+      invDoc.items[itemKey] = Math.max(0, Number(invDoc.items[itemKey] || 0) - 1);
+    }
+
+    await invDoc.save();
+    prog.markModified && prog.markModified('cards');
+    await prog.save();
+
+    const embed = new EmbedBuilder().setTitle('Haki Applied').setDescription(`Added 1 star of **${hakiKey}** Haki to **${card.name}**.`).setColor(0x00FF00);
+    if (isInteraction) await interactionOrMessage.reply({ embeds: [embed] }); else await channel.send({ embeds: [embed] });
     return;
   }
   if (weapon.type === "banner") {

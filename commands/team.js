@@ -221,16 +221,39 @@ export async function execute(interactionOrMessage, client) {
       const level = entry.level || 0;
       const baseAttackMin = Math.round((card.attackRange?.[0] || card.power || 0) * (1 + level * 0.01));
       const baseAttackMax = Math.round((card.attackRange?.[1] || card.power || 0) * (1 + level * 0.01));
-      const baseHealth = Math.round((card.health || 0) * (1 + level * 0.01));
+      let baseHealth = Math.round((card.health || 0) * (1 + level * 0.01));
+
+      // Apply Armament Haki per-owner if present (HP rounded to nearest 5, attack NOT rounded)
+      const userHaki = (entry && entry.haki) ? entry.haki : {};
+      let armamentMultiplier = 1;
+      try {
+        const { parseHaki } = await import('../lib/haki.js');
+        const ph = parseHaki(card);
+        if (ph && ph.armament && ph.armament.present) {
+          const stars = Math.max(0, Number(userHaki.armament || 0));
+          armamentMultiplier = 1 + 0.05 + (stars * 0.10);
+          baseHealth = Math.round(baseHealth * armamentMultiplier);
+        }
+      } catch (e) {}
 
       const cardBoost = detailed.details.find(d => d && d.id === id) || { atk:0, hp:0, special:0 };
-      const effectiveAttackMin = roundNearestFive(Math.round(baseAttackMin * (1 + cardBoost.atk / 100)));
-      const effectiveAttackMax = roundNearestFive(Math.round(baseAttackMax * (1 + cardBoost.atk / 100)));
+      const effectiveAttackMin = Math.round(baseAttackMin * (1 + cardBoost.atk / 100) * (armamentMultiplier || 1));
+      const effectiveAttackMax = Math.round(baseAttackMax * (1 + cardBoost.atk / 100) * (armamentMultiplier || 1));
       const effectiveHealth = roundNearestFive(Math.round(baseHealth * (1 + cardBoost.hp / 100)));
 
       const boostParts = [];
       if (cardBoost.atk) boostParts.push(`ATK+${cardBoost.atk}%`);
       if (cardBoost.hp) boostParts.push(`HP+${cardBoost.hp}%`);
+      // Show Armament Haki contribution
+      try {
+        const { parseHaki } = await import('../lib/haki.js');
+        const ph = parseHaki(card);
+        if (ph && ph.armament && ph.armament.present) {
+          const stars = Math.max(0, Number(userHaki.armament || 0));
+          const pct = Math.round((0.05 + (stars * 0.10)) * 100);
+          boostParts.push(`Haki(Arm)+${pct}%`);
+        }
+      } catch (e) {}
       if (cardBoost.special) boostParts.push(`SP+${cardBoost.special}%`);
 
       const attackDisplay = card.attackRange ? `${effectiveAttackMin} - ${effectiveAttackMax}` : effectiveAttackMin;

@@ -50,12 +50,11 @@ export const cards = [
     title: "Captain of the Strawhat pirates",
     rank: "B",
     power: 95,
-    attackRange: [25, 50],
     health: 200,
     type: "Attack",
     specialAttack: { name: "Gear Second", range: [50, 80], gif: "https://files.catbox.moe/s3xyhm.gif" },
     ability: null,
-    image: "https://files.catbox.moe/wqrrqt.webp",
+    image: "https://files.catbox.moe/abc_koby.webp",
     evolutions: ["luffy_a_04"],
     isUpgrade: true,
     upgradeRequirements: { cost: 3200, minLevel: 20 },
@@ -66,12 +65,12 @@ export const cards = [
     title: "Worst generation pirate",
     rank: "A",
     power: 330,
-    attackRange: [35, 70],
     health: 350,
     type: "Attack",
     specialAttack: { name: "Gear Second", range: [110, 160], gif: "https://files.catbox.moe/s3xyhm.gif" },
     ability: null,
     image: "https://files.catbox.moe/spyqxh.webp",
+    haki: ["observation","armament"],
     evolutions: ["luffy_s_05"],
     isUpgrade: true,
     upgradeRequirements: { cost: 7500, minLevel: 35 },
@@ -83,11 +82,12 @@ export const cards = [
     rank: "S",
     power: 620,
     attackRange: [80, 120],
-    health: 700,
+    health: 620,
     type: "Attack",
     specialAttack: { name: "Gear Fourth: Snakeman", range: [180, 240], gif: "https://files.catbox.moe/ud9v4t.gif" },
     ability: null,
     image: "https://files.catbox.moe/rt1ueq.jpg",
+    haki: ["advancedobservation","armament","advancedconqueror"],
     evolutions: ["luffy_ur_06"],
     isUpgrade: true,
     upgradeRequirements: { cost: 50000, minLevel: 75 },
@@ -104,6 +104,7 @@ export const cards = [
     specialAttack: { name: "Gomu Gomu no Bajrang Gun", range: [300, 380], gif: "https://files.catbox.moe/toppyn.gif" },
     ability: null,
     image: "https://files.catbox.moe/ppdc69.jpg",
+    haki: ["advancedobservation","advancedarmament","advancedconqueror"],
     evolutions: [],
     isUpgrade: true,
     upgradeRequirements: { cost: 150000, minLevel: 100 },
@@ -120,6 +121,7 @@ export const cards = [
     specialAttack: { name: "Galaxy Impact", range: [140, 180] },
     ability: null,
     image: "https://files.catbox.moe/dvemqd.webp",
+    haki: ["observation","advancedarmament","advancedconqueror"],
     evolutions: ["monkeydgarp_ss_02"],
     upgradeRequirements: { cost: 20000, minLevel: 50 },
   },
@@ -135,6 +137,7 @@ export const cards = [
     specialAttack: { name: "Galaxy Impact", range: [250, 350] },
     ability: null,
     image: "https://files.catbox.moe/gd7oud.webp",
+    haki: ["observation","advancedarmament","advancedconqueror"],
     evolutions: ["monkeydgarp_ur_03"],
     isUpgrade: true,
     upgradeRequirements: { cost: 40000, minLevel: 80 },
@@ -151,6 +154,7 @@ export const cards = [
     specialAttack: { name: "Galaxy Impact", range: [180, 240] },
     ability: null,
     image: "https://files.catbox.moe/zltzug.jpg",
+    haki: ["observation","advancedarmament","advancedconqueror"],
     evolutions: [],
     isUpgrade: true,
     upgradeRequirements: { cost: 95000, minLevel: 95 },
@@ -210,6 +214,7 @@ export const cards = [
     specialAttack: { name: "Fire Fist", range: [95, 145] },
     ability: null,
     image: "https://files.catbox.moe/hiw7wc.jpg",
+    haki: ["armament","conqueror"],
     evolutions: ["portgasdace_s_03"],
     isUpgrade: true,
     upgradeRequirements: { cost: 7500, minLevel: 30 },
@@ -226,6 +231,7 @@ export const cards = [
     specialAttack: { name: "Fire Fist", range: [110, 160] },
     ability: null,
     image: "https://files.catbox.moe/zqhyvx.jpg",
+    haki: ["armament","conqueror"],
     evolutions: [],
     isUpgrade: true,
     upgradeRequirements: { cost: 8500, minLevel: 40 },
@@ -796,7 +802,8 @@ export const cards = [
     evolutions: [],
     isUpgrade: true,
     upgradeRequirements: { cost: 28000, minLevel: 50 },
-  },
+    haki: ["observation","armament","advancedconqueror"],
+    },
   // SHIMOTSUKI VILLAGE CHARACTERS
   {
     id: "shimotsukikushiru_b_01",
@@ -972,7 +979,8 @@ export const cards = [
     type: "Support",
     ability: "Boosts team HP by 6%",
     boost: { hp: 6 },
-    image: "https://files.catbox.moe/y5c05w.webp",
+    image: "https://files.catbox.moe/abcdsmoker.webp",
+    haki: ["observation","armament"],
     evolutions: [],
   },
   // GAIMON
@@ -2256,8 +2264,8 @@ export const cards = [
   // Shanks family
   { id: "Shanks_c_01", name: "Shanks", title: "kid Shanks ", rank: "C", power: 26, attackRange: [5, 14], health: 78, type: "Attack", ability: null, image: "https://files.catbox.moe/gf5475.webp", evolutions: ["Shank_a_02"] },
   { id: "Shank_a_02", name: "Shanks", title: "\"Red Haired\"", rank: "A", power: 160, attackRange: [26, 44], health: 210, type: "Attack", ability: null, image: "https://files.catbox.moe/2lqama.jpg", evolutions: ["Shanks_ss_03"], isUpgrade: true, upgradeRequirements: { cost: 4500, minLevel: 25 } },
-  { id: "Shanks_ss_03", name: "Shanks", title: "Captain of the Red-Haired pirates", rank: "SS", power: 620, attackRange: [110, 160], health: 540, type: "Attack", specialAttack: { name: "Divine Departure", range: [200, 260], gif: "https://files.catbox.moe/23ypxz.gif" }, ability: null, image: "https://files.catbox.moe/v1xyfc.jpg", evolutions: ["Shanks_ur_04"], isUpgrade: true, upgradeRequirements: { cost: 50000, minLevel: 75 } },
-  { id: "Shanks_ur_04", name: "Shanks", title: "Emperor of the New World", rank: "UR", power: 1100, attackRange: [170, 230], health: 820, type: "Attack", specialAttack: { name: "Divine Departure", range: [260, 320], gif: "https://files.catbox.moe/23ypxz.gif" }, ability: null, image: "https://files.catbox.moe/tj9er0.jpg", evolutions: [], isUpgrade: true, upgradeRequirements: { cost: 150000, minLevel: 100 } },
+  { id: "Shanks_ss_03", name: "Shanks", title: "Captain of the Red-Haired pirates", rank: "SS", power: 620, attackRange: [110, 160], health: 540, type: "Attack", specialAttack: { name: "Divine Departure", range: [200, 260], gif: "https://files.catbox.moe/23ypxz.gif" }, ability: null, image: "https://files.catbox.moe/v1xyfc.jpg", evolutions: ["Shanks_ur_04"], isUpgrade: true, upgradeRequirements: { cost: 50000, minLevel: 75 }, haki: ["advancedobservation","armament","advancedconqueror"] },
+  { id: "Shanks_ur_04", name: "Shanks", title: "Emperor of the New World", rank: "UR", power: 1100, attackRange: [170, 230], health: 820, type: "Attack", specialAttack: { name: "Divine Departure", range: [260, 320], gif: "https://files.catbox.moe/23ypxz.gif" }, ability: null, image: "https://files.catbox.moe/tj9er0.jpg", evolutions: [], isUpgrade: true, upgradeRequirements: { cost: 150000, minLevel: 100 }, haki: ["advancedobservation","armament","advancedconqueror"] },
 
   // Red-Haired crewmembers
   { id: "Limejuice_b_01", name: "Limejuice", title: "Crewmember of the Red-Haired pirates", rank: "B", power: 46, attackRange: [10, 20], health: 110, type: "Support", ability: "Boosts team HP by 15%",
@@ -2421,7 +2429,7 @@ export const cards = [
 
   // Bartolomeo
   { id: "Bartolameo_a_01", name: "Bartolameo", title: "Captain of the Barto Club", rank: "A", power: 140, attackRange: [24, 44], health: 200, type: "Attack", specialAttack: { name: "Barrier Crash", range: [100, 140], gif: "https://files.catbox.moe/xwytob.gif" }, ability: null, image: "https://files.catbox.moe/0ue0k2.webp", evolutions: ["Bartolameo_s_02"] },
-  { id: "Bartolameo_s_02", name: "Bartolameo", title: "Captain of the Straw Hat Grand Fleet", rank: "S", power: 320, attackRange: [40, 80], health: 320, type: "Attack", specialAttack: { name: "Barrier Crash", range: [180, 240], gif: "https://files.catbox.moe/xwytob.gif" }, ability: null, image: "https://files.catbox.moe/wdsvmu.webp", evolutions: [], isUpgrade: true, upgradeRequirements: { cost: 9000, minLevel: 35 } },
+  { id: "Bartolameo_s_02", name: "Bartolameo", title: "Captain of the Straw Hat Grand Fleet", rank: "S", power: 320, attackRange: [40, 80], health: 320, type: "Attack", specialAttack: { name: "Barrier Crash", range: [180, 240], gif: "https://files.catbox.moe/xwytob.gif" }, ability: null, image: "https://files.catbox.moe/wdsvmu.webp", evolutions: [], isUpgrade: true, upgradeRequirements: { cost: 9000, minLevel: 35 }, haki: ["observation","armament"] },
 
   { id: "Gambia_c_01", name: "Gambia", title: "Staff officer of the Barto Club", rank: "C", power: 18, attackRange: [3, 9], health: 66, type: "Support", ability: "Boosts team HP by 10%",
     boost: { hp: 10 }, image: "https://files.catbox.moe/" },
@@ -2498,7 +2506,6 @@ try {
 
 for (const c of cards) {
   if (!c || typeof c !== 'object') continue;
-  // preserve original attack range so we can optionally revert at runtime
   if (Array.isArray(c.attackRange)) {
     try { c._originalAttackRange = [Number(c.attackRange[0] || 0), Number(c.attackRange[1] || 0)]; } catch (e) { c._originalAttackRange = null; }
   }
@@ -2537,7 +2544,7 @@ for (const c of cards) {
 // Optionally revert attackRange to original unrounded values at runtime by
 // setting environment variable RESTORE_UNROUNDED_ATTACKS=true. This instructs
 // the loader to restore `attackRange` from the preserved `_originalAttackRange`.
-if (process.env.RESTORE_UNROUNDED_ATTACKS === 'true') {
+  if (process.env.RESTORE_UNROUNDED_ATTACKS === 'true') {
   for (const c of cards) {
     if (c && Array.isArray(c._originalAttackRange) && c._originalAttackRange.length === 2) {
       c.attackRange = [Number(c._originalAttackRange[0]), Number(c._originalAttackRange[1])];

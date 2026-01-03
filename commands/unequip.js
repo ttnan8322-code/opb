@@ -51,8 +51,10 @@ export async function execute(interactionOrMessage, client) {
     const parts = interactionOrMessage.content.trim().split(/\s+/);
     parts.splice(0, 2); // remove prefix and command
     if (parts.length === 1) {
-      // could be either weapon name or card name — try card first
-      cardQuery = parts[0];
+      // could be either weapon name or card name — try weapon first then fallback to card
+      const maybe = parts[0];
+      const maybeWeapon = getWeaponById(maybe);
+      if (maybeWeapon) weaponQuery = maybe; else cardQuery = maybe;
     } else if (parts.length >= 2) {
       weaponQuery = parts[0];
       cardQuery = parts.slice(1).join(" ");

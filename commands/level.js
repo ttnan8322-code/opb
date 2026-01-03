@@ -118,10 +118,8 @@ export default {
       else await interactionOrMessage.channel.send(r);
       return;
     }
-    // This ensures we don't lose existing level when adding xp
-    if (entry.level && (!entry.xp || entry.xp === 0)) {
-      entry.xp = entry.level * 100;
-    }
+    // Ensure xp field is a remainder (0-99). Do not scale xp by level.
+    entry.xp = entry.xp || 0;
 
 
     // helper to read items map safely

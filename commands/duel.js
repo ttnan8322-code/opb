@@ -6,6 +6,7 @@ import Progress from "../models/Progress.js";
 import { getCardById } from "../cards.js";
 import { roundNearestFive, roundRangeToFive } from "../lib/stats.js";
 import { computeTeamBoosts } from "../lib/boosts.js";
+import { parseHaki, applyHakiStatBoosts, DEVIL_FRUIT_USERS } from "../lib/haki.js";
 import Quest from "../models/Quest.js";
 
 const DUEL_SESSIONS = global.__DUEL_SESSIONS ||= new Map();
@@ -101,7 +102,9 @@ export async function execute(interactionOrMessage) {
       p1Duel.duelOpponents = new Map();
     }
     const duelCount = p1Duel.duelOpponents.get(opponent.id) || 0;
-    if (duelCount >= 3) {
+    // Allow bot owner unlimited duels
+    const ownerId = process.env.OWNER_ID;
+    if (duelCount >= 3 && String(userId) !== String(ownerId)) {
       const reply = `You've already dueled ${opponent.username} 3 times today!`;
       if (isInteraction) return interactionOrMessage.reply({ content: reply, ephemeral: true });
       return channel.send(reply);
@@ -123,10 +126,10 @@ export async function execute(interactionOrMessage) {
 
   // Setup duel acceptance collector (30s timeout)
   const filter = (i) => i.user.id === opponent.id;
-  const collector = msg.createMessageComponentCollector({ filter, time: 30000 });
+  const collector = msg.createMessageComponentCollector({ filter, time: 45000 });
 
   collector.on("collect", async i => {
-    await i.deferUpdate();
+    try { if (!i.deferred && !i.replied) await i.deferUpdate(); } catch (e) { if (!(e && e.code === 10062)) console.error('deferUpdate error', e); }
 
     if (i.customId.startsWith("duel_decline")) {
       try {
@@ -239,15 +242,19 @@ export async function execute(interactionOrMessage) {
         }
 
         // Ensure stats are rounded to nearest 5 for consistency
-        const finalPower = roundNearestFive(Math.round(power));
-        const finalAttackMin = roundNearestFive(Math.round(attackMin));
-        const finalAttackMax = roundNearestFive(Math.round(attackMax));
-        const finalHealth = roundNearestFive(Math.round(health));
+        let scaled = { attackRange: [Math.round(attackMin), Math.round(attackMax)], power: Math.round(power) };
+        const hakiApplied = applyHakiStatBoosts(scaled, card, progress);
+        scaled = hakiApplied.scaled;
+        const finalPower = roundNearestFive(Math.round(scaled.power));
+        const finalAttackMin = roundNearestFive(Math.round(scaled.attackRange[0] || 0));
+        const finalAttackMax = roundNearestFive(Math.round(scaled.attackRange[1] || 0));
+        const finalHealth = roundNearestFive(Math.round(health * (hakiApplied.haki.armament.multiplier || 1)));
+        const hakiParsed = parseHaki(card);
         if (special && special.range) special.range = roundRangeToFive([Math.round(special.range[0] || 0), Math.round(special.range[1] || 0)]);
 
         // Track special usage and exhaustion state for match
         // Add stamina (max 3) and attackedLastTurn flag for stamina regen rules
-        return { cardId, card, scaled: { attackRange: [finalAttackMin, finalAttackMax], specialAttack: special, power: finalPower }, health: finalHealth, maxHealth: finalHealth, level, usedSpecial: false, skipNextTurnPending: false, skipThisTurn: false, stamina: 3, attackedLastTurn: false };
+        return { cardId, card, scaled: { attackRange: [finalAttackMin, finalAttackMax], specialAttack: special, power: finalPower }, health: finalHealth, maxHealth: finalHealth, level, usedSpecial: false, skipNextTurnPending: false, skipThisTurn: false, stamina: 3, attackedLastTurn: false, haki: hakiParsed, dodgeChance: (hakiParsed.observation.stars || 0) * 0.05 };
       });
 
       // compute team-wide boosts (hp/atk/special) for p2
@@ -296,19 +303,22 @@ export async function execute(interactionOrMessage) {
           health = Math.round(health * 1.05);
         }
 
-        // Ensure stats are rounded to nearest 5 for consistency
-        const finalPower = roundNearestFive(Math.round(power));
-        const finalAttackMin = roundNearestFive(Math.round(attackMin));
-        const finalAttackMax = roundNearestFive(Math.round(attackMax));
-        const finalHealth = roundNearestFive(Math.round(health));
+        let scaled = { attackRange: [Math.round(attackMin), Math.round(attackMax)], power: Math.round(power) };
+        const hakiApplied = applyHakiStatBoosts(scaled, card, progress);
+        scaled = hakiApplied.scaled;
+        const finalPower = roundNearestFive(Math.round(scaled.power));
+        const finalAttackMin = roundNearestFive(Math.round(scaled.attackRange[0] || 0));
+        const finalAttackMax = roundNearestFive(Math.round(scaled.attackRange[1] || 0));
+        const finalHealth = roundNearestFive(Math.round(health * (hakiApplied.haki.armament.multiplier || 1)));
+        const hakiParsed = parseHaki(card);
         if (special && special.range) special.range = roundRangeToFive([Math.round(special.range[0] || 0), Math.round(special.range[1] || 0)]);
 
-        return { cardId, card, scaled: { attackRange: [finalAttackMin, finalAttackMax], specialAttack: special, power: finalPower }, health: finalHealth, maxHealth: finalHealth, level, stamina: 3, attackedLastTurn: false };
+        return { cardId, card, scaled: { attackRange: [finalAttackMin, finalAttackMax], specialAttack: special, power: finalPower }, health: finalHealth, maxHealth: finalHealth, level, stamina: 3, attackedLastTurn: false, haki: hakiParsed, dodgeChance: (hakiParsed.observation.stars || 0) * 0.05 };
       });
 
       // Determine who goes first (highest power)
-      const p1Power = Math.max(...p1Cards.map(c => c.scaled.power || 0));
-      const p2Power = Math.max(...p2Cards.map(c => c.scaled.power || 0));
+      const p1Power = p1Cards.reduce((s,c) => s + (c.scaled.power || 0), 0);
+      const p2Power = p2Cards.reduce((s,c) => s + (c.scaled.power || 0), 0);
       const firstPlayer = p1Power >= p2Power ? userId : opponent.id;
 
       DUEL_SESSIONS.set(sessionId, {
@@ -371,6 +381,10 @@ async function startDuelTurn(sessionId, channel) {
       c.stamina = 3; c.attackedLastTurn = false;
     }
   });
+  // Ensure any knocked-out cards have zero stamina (stamina irrelevant when dead)
+  [session.p1, session.p2].forEach(side => {
+    side.cards.forEach(c => { if (c.health <= 0) c.stamina = 0; });
+  });
   normalizeLifeIndex(attacker);
   normalizeLifeIndex(defender);
 
@@ -379,6 +393,21 @@ async function startDuelTurn(sessionId, channel) {
     // Attacker won
     await endDuel(sessionId, attacker, defender, channel);
     return;
+  }
+
+  // If attacker has no playable cards this turn, auto-skip to defender.
+  const attackerHasPlayable = attacker.cards.some(c => c.health > 0 && !c.skipThisTurn && (typeof c.stamina !== 'number' || c.stamina > 0));
+  const defenderHasPlayable = defender.cards.some(c => c.health > 0 && !c.skipThisTurn && (typeof c.stamina !== 'number' || c.stamina > 0));
+  if (!attackerHasPlayable) {
+    if (defenderHasPlayable) {
+      session.currentTurn = defender.userId;
+      await startDuelTurn(sessionId, channel);
+      return;
+    } else {
+      // Both sides have no playable cards — end as a draw
+      await endDuelDraw(sessionId, channel);
+      return;
+    }
   }
 
   // Helper to render HP bar
@@ -411,10 +440,22 @@ async function startDuelTurn(sessionId, channel) {
       .setDisabled(card.health <= 0 || card.skipThisTurn || (typeof card.stamina === 'number' && card.stamina <= 0));
   });
 
+  // Determine if the attacker has any playable characters this turn
+  const hasPlayable = attacker.cards.some(c => c.health > 0 && !c.skipThisTurn && (typeof c.stamina !== 'number' || c.stamina > 0));
+
   const rows = [];
   for (let i = 0; i < charButtons.length; i += 5) {
     rows.push(new ActionRowBuilder().addComponents(charButtons.slice(i, i + 5)));
   }
+
+  // Add a single grey Haki button; clicking it will allow selecting a character if multiple support Haki
+  const anyHakiPlayable = attacker.cards.some(card => (card.haki && (card.haki.armament.present || card.haki.observation.present || card.haki.conqueror.present)) && card.health > 0 && !(typeof card.stamina === 'number' && card.stamina <= 0));
+  const hakiButton = new ButtonBuilder()
+    .setCustomId(`duel_haki:${sessionId}:all`)
+    .setLabel(`Haki`)
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(!anyHakiPlayable);
+  rows.push(new ActionRowBuilder().addComponents(hakiButton));
 
   // Always send a fresh message for the turn to avoid reusing the same interactive message
   let msg;
@@ -437,17 +478,65 @@ async function startDuelTurn(sessionId, channel) {
   }
 
   const filter = (i) => i.user.id === attacker.userId;
-  const collector = msg.createMessageComponentCollector({ filter, time: 30000 });
+  const collector = msg.createMessageComponentCollector({ filter, time: 45000 });
 
   collector.on("collect", async i => {
-    if (!i.customId.startsWith("duel_selectchar")) return;
-    
-    await i.deferUpdate();
-    const charIdx = parseInt(i.customId.split(":")[2]);
+    if (!i.customId.startsWith("duel_selectchar") && !i.customId.startsWith("duel_haki")) return;
+
+    // Safe defer (interaction may be already replied/expired)
+    try { if (!i.deferred && !i.replied) await i.deferUpdate(); } catch (e) { if (!(e && e.code === 10062)) console.error('deferUpdate error', e); }
+    const parts = i.customId.split(":");
+      const charPart = parts[2];
+      let charIdx = null;
+      if (i.customId.startsWith("duel_selectchar")) charIdx = parseInt(charPart);
+      else if (i.customId.startsWith("duel_haki") && charPart !== 'all') charIdx = parseInt(charPart);
+
+    if (i.customId.startsWith("duel_haki")) {
+      // If single 'all' button, open selector for which character's haki to use
+      if (charPart === 'all') {
+        // Build selector buttons for characters that support haki
+        const options = attacker.cards.map((c, idx) => ({ idx, name: c.card.name, has: !!(c.haki && (c.haki.armament.present || c.haki.observation.present || c.haki.conqueror.present)), alive: c.health > 0, playable: !(typeof c.stamina === 'number' && c.stamina <= 0) }));
+        const entries = options.filter(o => o.has && o.alive && o.playable);
+        if (entries.length === 0) {
+          try { await i.followUp({ content: 'No playable characters with Haki available.', ephemeral: true }); } catch (e) {}
+          return;
+        }
+        const { EmbedBuilder, ActionRowBuilder, ButtonBuilder } = await import('discord.js');
+        const embed = new EmbedBuilder().setTitle('Choose Haki Character').setDescription('Select which character to open Haki menu for.').setColor(0x3498db);
+        const btns = entries.map(e => new ButtonBuilder().setCustomId(`duel_haki_select:${sessionId}:${e.idx}`).setLabel(e.name).setStyle(ButtonStyle.Primary));
+        const selRow = new ActionRowBuilder().addComponents(btns.slice(0,5));
+        try { const follow = await i.followUp({ embeds: [embed], components: [selRow], ephemeral: true }); } catch (e) {}
+
+        // Collector for selection
+        const selFilter = (ii) => ii.user.id === attacker.userId && ii.customId && ii.customId.startsWith('duel_haki_select');
+          const selCollector = i.channel.createMessageComponentCollector({ filter: selFilter, time: 20000 });
+          selCollector.on('collect', async ii => {
+            try { if (!ii.deferred && !ii.replied) await ii.deferUpdate(); } catch (err) { if (!(err && err.code === 10062)) console.error('defer err', err); }
+            const selParts = ii.customId.split(':');
+            const selIdx = parseInt(selParts[2]);
+            try {
+              await handleHakiMenu(sessionId, selIdx, msg, attacker, defender, channel, ii);
+            } catch (err) {
+              console.error('handleHakiMenu error', err);
+              try { await ii.followUp({ content: 'An error occurred opening Haki menu.', ephemeral: true }); } catch (e) {}
+            }
+            selCollector.stop();
+          });
+        return;
+      }
+      // otherwise older per-character id (fallback)
+      try {
+        await handleHakiMenu(sessionId, charIdx, msg, attacker, defender, channel, i);
+      } catch (err) {
+        console.error('handleHakiMenu error', err);
+        try { await i.followUp({ content: 'An error occurred opening Haki menu.', ephemeral: true }); } catch (e) {}
+      }
+      return;
+    }
 
     // Check if selected character is dead
-    if (attacker.cards[charIdx].health <= 0) {
-      await i.followUp({ content: "That character is already defeated!", ephemeral: true });
+    if (charIdx == null || isNaN(charIdx) || attacker.cards[charIdx].health <= 0) {
+      try { await i.followUp({ content: "That character is already defeated!", ephemeral: true }); } catch (e) {}
       return;
     }
 
@@ -457,10 +546,18 @@ async function startDuelTurn(sessionId, channel) {
 
   collector.on("end", async (collected) => {
     if (collected.size === 0) {
-      // Timeout - skip turn
-      session.currentTurn = defender.userId;
-      // do not delete the message; reuse it for next turn
-      await startDuelTurn(sessionId, channel);
+      if (hasPlayable) {
+        // Player had playable options but didn't act — they forfeit the duel
+        try { await channel.send(`${attacker.user} did not act in time and forfeits the duel.`); } catch (e) {}
+        const s = DUEL_SESSIONS.get(sessionId);
+        if (s) s.timedOut = true;
+        session.currentTurn = defender.userId;
+        await endDuel(sessionId, defender, attacker, channel);
+      } else {
+        // No playable options — skip turn
+        session.currentTurn = defender.userId;
+        await startDuelTurn(sessionId, channel);
+      }
     }
   });
 }
@@ -495,12 +592,12 @@ async function selectAttackType(sessionId, charIdx, msg, attacker, channel) {
   } catch (e) {}
 
   const filter = (i) => i.user.id === attacker.userId;
-  const collector = msg.createMessageComponentCollector({ filter, time: 30000 });
+  const collector = msg.createMessageComponentCollector({ filter, time: 45000 });
 
   collector.on("collect", async i => {
     if (!i.customId.startsWith("duel_attack")) return;
     
-    await i.deferUpdate();
+    try { if (!i.deferred && !i.replied) await i.deferUpdate(); } catch (e) { if (!(e && e.code === 10062)) console.error('deferUpdate error', e); }
     const attackType = i.customId.split(":")[3];
 
     // Now select target
@@ -509,9 +606,17 @@ async function selectAttackType(sessionId, charIdx, msg, attacker, channel) {
 
   collector.on("end", async (collected) => {
     if (collected.size === 0) {
-      // Timeout - skip turn
-      session.currentTurn = defender.userId;
-      await startDuelTurn(sessionId, channel);
+      const hasAttackOptions = (stam >= 1);
+      if (hasAttackOptions) {
+        try { await channel.send(`${attacker.user} did not act in time and forfeits the duel.`); } catch (e) {}
+        const s = DUEL_SESSIONS.get(sessionId);
+        if (s) s.timedOut = true;
+        session.currentTurn = defender.userId;
+        await endDuel(sessionId, defender, attacker, channel);
+      } else {
+        session.currentTurn = defender.userId;
+        await startDuelTurn(sessionId, channel);
+      }
     }
   });
 }
@@ -545,12 +650,12 @@ async function selectTarget(sessionId, charIdx, attackType, msg, attacker, defen
   } catch (e) {}
 
   const filter = (i) => i.user.id === attacker.userId;
-  const collector = msg.createMessageComponentCollector({ filter, time: 30000 });
+  const collector = msg.createMessageComponentCollector({ filter, time: 45000 });
 
   collector.on("collect", async i => {
     if (!i.customId.startsWith("duel_target")) return;
     
-    await i.deferUpdate();
+    try { if (!i.deferred && !i.replied) await i.deferUpdate(); } catch (e) { if (!(e && e.code === 10062)) console.error('deferUpdate error', e); }
     const targetIdx = parseInt(i.customId.split(":")[4]);
 
     // Execute attack
@@ -559,12 +664,276 @@ async function selectTarget(sessionId, charIdx, attackType, msg, attacker, defen
 
   collector.on("end", async (collected) => {
     if (collected.size === 0) {
-      // Timeout - skip turn
+      // Timeout - treat as forfeit (target selection only shown when an attack was initiated)
+      try { await channel.send(`${attacker.user} did not act in time and forfeits the duel.`); } catch (e) {}
+      const s = DUEL_SESSIONS.get(sessionId);
+      if (s) s.timedOut = true;
       session.currentTurn = defender.userId;
       await msg.delete().catch(() => {});
-      await startDuelTurn(sessionId, channel);
+      await endDuel(sessionId, defender, attacker, channel);
     }
   });
+}
+
+async function handleHakiMenu(sessionId, charIdx, msg, attacker, defender, channel, interaction) {
+  const session = DUEL_SESSIONS.get(sessionId);
+  if (!session) return;
+  const card = attacker.cards[charIdx];
+  if (!card) {
+    try { await interaction.followUp({ content: 'Invalid character', ephemeral: true }); } catch (e) {}
+    return;
+  }
+
+  const haki = card.haki || { armament: { stars:0 }, observation:{stars:0}, conqueror:{stars:0} };
+  const opts = [];
+  // Advanced Observation -> Future Sight
+  if (haki.observation && haki.observation.advanced) opts.push({ id: 'futuresight', label: 'Future Sight', cost: 1, style: ButtonStyle.Primary });
+  // Advanced Armament -> Ryou
+  if (haki.armament && haki.armament.advanced) opts.push({ id: 'ryou', label: 'Ryou', cost: 2, style: ButtonStyle.Danger });
+  // Conqueror basic
+  if (haki.conqueror && haki.conqueror.stars > 0) opts.push({ id: 'conqueror', label: 'Conqueror Strike', cost: 2, style: ButtonStyle.Success });
+  // Conqueror AoE (available if card has conqueror at all) — base 5% even at 0 stars
+  if (haki.conqueror && haki.conqueror.present) opts.push({ id: 'conq_aoe', label: 'Conqueror AoE', cost: 3, style: ButtonStyle.Danger });
+
+  if (opts.length === 0) {
+    try { await interaction.followUp({ content: 'This character has no Haki abilities.', ephemeral: true }); } catch (e) {}
+    return;
+  }
+
+  const { EmbedBuilder, ActionRowBuilder, ButtonBuilder } = await import('discord.js');
+  const embed = new EmbedBuilder().setTitle(`${card.card.name} — Haki Menu`).setDescription('Choose a Haki ability to use. These do not consume your turn but cost stamina.').setColor(0x3498db);
+
+  const btns = opts.map(o => new ButtonBuilder().setCustomId(`duel_haki_use:${sessionId}:${charIdx}:${o.id}`).setLabel(`${o.label} (Cost: ${o.cost})`).setStyle(o.style));
+  const row = new ActionRowBuilder().addComponents(btns.slice(0,5));
+  try { await interaction.followUp({ embeds: [embed], components: [row], ephemeral: true }); } catch (e) {}
+
+  // create a short-lived collector on the interaction reply by listening to the channel
+  const collectorMsgFilter = (i) => i.user.id === attacker.userId && i.customId && i.customId.startsWith('duel_haki_use');
+  const collector2 = interaction.channel.createMessageComponentCollector({ filter: collectorMsgFilter, time: 20000 });
+  collector2.on('collect', async i => {
+    if (!i.customId.startsWith('duel_haki_use')) return;
+    try { if (!i.deferred && !i.replied) await i.deferUpdate(); } catch (e) { if (!(e && e.code === 10062)) console.error('deferUpdate error', e); }
+    const parts = i.customId.split(':');
+    const ability = parts[3];
+    try {
+      await performHakiAbility(sessionId, charIdx, ability, attacker, defender, channel, i);
+    } catch (err) {
+      console.error('performHakiAbility error', err);
+      try { await i.followUp({ content: 'An error occurred performing Haki ability.', ephemeral: true }); } catch (e) {}
+    }
+    collector2.stop();
+  });
+}
+
+async function performHakiAbility(sessionId, charIdx, ability, attacker, defender, channel, interaction) {
+  const session = DUEL_SESSIONS.get(sessionId);
+  if (!session) return;
+  const sideKey = (attacker === session.p1) ? 'p1' : 'p2';
+  const oppKey = sideKey === 'p1' ? 'p2' : 'p1';
+  const card = attacker.cards[charIdx];
+  if (!card) { try { await interaction.followUp({ content: 'Invalid card', ephemeral: true }); } catch(e){}; return; }
+
+  const haki = card.haki || { armament: { stars:0 }, observation:{stars:0}, conqueror:{stars:0} };
+
+  if (ability === 'ryou') {
+    // cost 2 stamina
+    if ((card.stamina || 0) < 2) { await interaction.followUp({ content: 'Not enough stamina for Ryou.', ephemeral: true }); return; }
+    card.stamina = Math.max(0, card.stamina - 2);
+    // set ryou flag on this side: next incoming attack from opponent will be redirected to this card and do zero damage
+    session[sideKey].ryou = { cardIdx: charIdx, remaining: 1 };
+    // send summary embed only and refresh main duel message/components
+    try {
+      const summary = new EmbedBuilder().setTitle('Ryou — Haki Used').setDescription(`${attacker.user} used **Ryou** with ${card.card.name}.\nStamina: ${card.stamina}/3\nEffect: Next incoming attack will be redirected to ${card.card.name} and deal no damage.`).setColor(0x3498db);
+      await channel.send({ embeds: [summary] }).catch(() => {});
+      const sess = DUEL_SESSIONS.get(sessionId);
+      if (sess && sess.msgId) {
+        const mainMsg = await channel.messages.fetch(sess.msgId).catch(() => null);
+        if (mainMsg) {
+          // rebuild components based on updated attacker.cards
+          const charButtons = attacker.cards.map((c, idx) => new ButtonBuilder().setCustomId(`duel_selectchar:${sessionId}:${idx}`).setLabel(`${c.card.name}`).setStyle(ButtonStyle.Primary).setDisabled(c.health <= 0 || c.skipThisTurn || (typeof c.stamina === 'number' && c.stamina <= 0)));
+          const rows = [];
+          for (let i = 0; i < charButtons.length; i += 5) rows.push(new ActionRowBuilder().addComponents(charButtons.slice(i, i + 5)));
+          const anyHakiPlayable = attacker.cards.some(c => (c.haki && (c.haki.armament.present || c.haki.observation.present || c.haki.conqueror.present)) && c.health > 0 && !(typeof c.stamina === 'number' && c.stamina <= 0));
+          const hakiButton = new ButtonBuilder().setCustomId(`duel_haki:${sessionId}:all`).setLabel(`Haki`).setStyle(ButtonStyle.Secondary).setDisabled(!anyHakiPlayable);
+          rows.push(new ActionRowBuilder().addComponents(hakiButton));
+          // rebuild embed text
+          function renderHP(cur, max, len = 10) { const ratio = max > 0 ? cur / max : 0; const filled = Math.max(0, Math.min(len, Math.round(ratio * len))); return '▬'.repeat(filled) + '▭'.repeat(len - filled); }
+          const lines = attacker.cards.map((c, idx) => { const name = c.card.name; const hp = Math.max(0, c.health); const extra = c.skipThisTurn ? ' (exhausted)' : ''; const stam = (typeof c.stamina === 'number') ? c.stamina : 3; return `**${idx + 1}. ${name}**${extra} — HP: ${hp}/${c.maxHealth} ${renderHP(hp, c.maxHealth)} • <:stamina:1456082884732391570> ${stam}/3`; }).join('\n');
+          const embed = makeEmbed("Your Turn", `${attacker.user}, choose a character to attack with!\n\n${lines}`);
+          await mainMsg.edit({ embeds: [embed], components: rows }).catch(() => {});
+        }
+      }
+    } catch (e) {}
+    // Refresh main duel embed so HP/stamina are visible and buttons remain active
+    try {
+      const sess = DUEL_SESSIONS.get(sessionId);
+      if (sess && sess.msgId) {
+        const mainMsg = await channel.messages.fetch(sess.msgId).catch(() => null);
+        if (mainMsg) {
+          function renderHP(cur, max, len = 10) { const ratio = max > 0 ? cur / max : 0; const filled = Math.max(0, Math.min(len, Math.round(ratio * len))); return '▬'.repeat(filled) + '▭'.repeat(len - filled); }
+          const lines = attacker.cards.map((c, idx) => {
+            const name = c.card.name;
+            const hp = Math.max(0, c.health);
+            const extra = c.skipThisTurn ? ' (exhausted)' : '';
+            const stam = (typeof c.stamina === 'number') ? c.stamina : 3;
+            return `**${idx + 1}. ${name}**${extra} — HP: ${hp}/${c.maxHealth} ${renderHP(hp, c.maxHealth)} • <:stamina:1456082884732391570> ${stam}/3`;
+          }).join('\n');
+          const embed = makeEmbed("Your Turn", `${attacker.user}, choose a character to attack with!\n\n${lines}`);
+          await mainMsg.edit({ embeds: [embed], components: mainMsg.components }).catch(() => {});
+        }
+      }
+    } catch (e) {}
+    return;
+  }
+
+  if (ability === 'futuresight') {
+    if ((card.stamina || 0) < 1) { await interaction.followUp({ content: 'Not enough stamina for Future Sight.', ephemeral: true }); return; }
+    card.stamina = Math.max(0, card.stamina - 1);
+    // mark futureSight on session so incoming attacks can reliably detect dodge
+    try { session[sideKey] = session[sideKey] || {}; session[sideKey].futureSight = { cardIdx: charIdx }; } catch (e) {}
+    card.nextAttackGuaranteedDodge = true;
+    try {
+      const summary = new EmbedBuilder().setTitle('Future Sight — Haki Used').setDescription(`${attacker.user} used **Future Sight** on ${card.card.name}.\nStamina: ${card.stamina}/3\nEffect: ${card.card.name} will dodge the next incoming attack.`).setColor(0x3498db);
+      await channel.send({ embeds: [summary] }).catch(() => {});
+      const sess = DUEL_SESSIONS.get(sessionId);
+      if (sess && sess.msgId) {
+        const mainMsg = await channel.messages.fetch(sess.msgId).catch(() => null);
+        if (mainMsg) {
+          const charButtons = attacker.cards.map((c, idx) => new ButtonBuilder().setCustomId(`duel_selectchar:${sessionId}:${idx}`).setLabel(`${c.card.name}`).setStyle(ButtonStyle.Primary).setDisabled(c.health <= 0 || c.skipThisTurn || (typeof c.stamina === 'number' && c.stamina <= 0)));
+          const rows = [];
+          for (let i = 0; i < charButtons.length; i += 5) rows.push(new ActionRowBuilder().addComponents(charButtons.slice(i, i + 5)));
+          const anyHakiPlayable = attacker.cards.some(c => (c.haki && (c.haki.armament.present || c.haki.observation.present || c.haki.conqueror.present)) && c.health > 0 && !(typeof c.stamina === 'number' && c.stamina <= 0));
+          const hakiButton = new ButtonBuilder().setCustomId(`duel_haki:${sessionId}:all`).setLabel(`Haki`).setStyle(ButtonStyle.Secondary).setDisabled(!anyHakiPlayable);
+          rows.push(new ActionRowBuilder().addComponents(hakiButton));
+          function renderHP(cur, max, len = 10) { const ratio = max > 0 ? cur / max : 0; const filled = Math.max(0, Math.min(len, Math.round(ratio * len))); return '▬'.repeat(filled) + '▭'.repeat(len - filled); }
+          const lines = attacker.cards.map((c, idx) => { const name = c.card.name; const hp = Math.max(0, c.health); const extra = c.skipThisTurn ? ' (exhausted)' : ''; const stam = (typeof c.stamina === 'number') ? c.stamina : 3; return `**${idx + 1}. ${name}**${extra} — HP: ${hp}/${c.maxHealth} ${renderHP(hp, c.maxHealth)} • <:stamina:1456082884732391570> ${stam}/3`; }).join('\n');
+          const embed = makeEmbed("Your Turn", `${attacker.user}, choose a character to attack with!\n\n${lines}`);
+          await mainMsg.edit({ embeds: [embed], components: rows }).catch(() => {});
+        }
+      }
+    } catch (e) {}
+    try {
+      const sess = DUEL_SESSIONS.get(sessionId);
+      if (sess && sess.msgId) {
+        const mainMsg = await channel.messages.fetch(sess.msgId).catch(() => null);
+        if (mainMsg) {
+          function renderHP(cur, max, len = 10) { const ratio = max > 0 ? cur / max : 0; const filled = Math.max(0, Math.min(len, Math.round(ratio * len))); return '▬'.repeat(filled) + '▭'.repeat(len - filled); }
+          const lines = attacker.cards.map((c, idx) => {
+            const name = c.card.name; const hp = Math.max(0, c.health); const extra = c.skipThisTurn ? ' (exhausted)' : ''; const stam = (typeof c.stamina === 'number') ? c.stamina : 3;
+            return `**${idx + 1}. ${name}**${extra} — HP: ${hp}/${c.maxHealth} ${renderHP(hp, c.maxHealth)} • <:stamina:1456082884732391570> ${stam}/3`;
+          }).join('\n');
+          const embed = makeEmbed("Your Turn", `${attacker.user}, choose a character to attack with!\n\n${lines}`);
+          await mainMsg.edit({ embeds: [embed], components: mainMsg.components }).catch(() => {});
+        }
+      }
+    } catch (e) {}
+    return;
+  }
+
+  if (ability === 'conqueror') {
+    if ((card.stamina || 0) < 2) { await interaction.followUp({ content: 'Not enough stamina for Conqueror Strike.', ephemeral: true }); return; }
+    card.stamina = Math.max(0, card.stamina - 2);
+    const stars = (card.haki && card.haki.conqueror && card.haki.conqueror.stars) || 0;
+    const threshold = 100 + (stars * 10);
+    const knocked = [];
+    for (const c of defender.cards) {
+      if (c.health > 0 && c.health <= threshold) {
+        c.health = 0; c.stamina = 0; knocked.push(c.card.name);
+      }
+    }
+    try {
+      const summary = new EmbedBuilder().setTitle("Conqueror's Haki — Used").setDescription(`${attacker.user} used **Conqueror's Haki** with ${card.card.name}.\nStamina: ${card.stamina}/3\nKnocked out: ${knocked.length ? knocked.join(', ') : 'None'}`).setColor(0x3498db);
+      await channel.send({ embeds: [summary] }).catch(() => {});
+      const sess = DUEL_SESSIONS.get(sessionId);
+      if (sess && sess.msgId) {
+        const mainMsg = await channel.messages.fetch(sess.msgId).catch(() => null);
+        if (mainMsg) {
+          const charButtons = attacker.cards.map((c, idx) => new ButtonBuilder().setCustomId(`duel_selectchar:${sessionId}:${idx}`).setLabel(`${c.card.name}`).setStyle(ButtonStyle.Primary).setDisabled(c.health <= 0 || c.skipThisTurn || (typeof c.stamina === 'number' && c.stamina <= 0)));
+          const rows = [];
+          for (let i = 0; i < charButtons.length; i += 5) rows.push(new ActionRowBuilder().addComponents(charButtons.slice(i, i + 5)));
+          const anyHakiPlayable = attacker.cards.some(c => (c.haki && (c.haki.armament.present || c.haki.observation.present || c.haki.conqueror.present)) && c.health > 0 && !(typeof c.stamina === 'number' && c.stamina <= 0));
+          const hakiButton = new ButtonBuilder().setCustomId(`duel_haki:${sessionId}:all`).setLabel(`Haki`).setStyle(ButtonStyle.Secondary).setDisabled(!anyHakiPlayable);
+          rows.push(new ActionRowBuilder().addComponents(hakiButton));
+          function renderHP(cur, max, len = 10) { const ratio = max > 0 ? cur / max : 0; const filled = Math.max(0, Math.min(len, Math.round(ratio * len))); return '▬'.repeat(filled) + '▭'.repeat(len - filled); }
+          const lines = attacker.cards.map((c, idx) => { const name = c.card.name; const hp = Math.max(0, c.health); const extra = c.skipThisTurn ? ' (exhausted)' : ''; const stam = (typeof c.stamina === 'number') ? c.stamina : 3; return `**${idx + 1}. ${name}**${extra} — HP: ${hp}/${c.maxHealth} ${renderHP(hp, c.maxHealth)} • <:stamina:1456082884732391570> ${stam}/3`; }).join('\n');
+          const embed = makeEmbed("Your Turn", `${attacker.user}, choose a character to attack with!\n\n${lines}`);
+          await mainMsg.edit({ embeds: [embed], components: rows }).catch(() => {});
+        }
+      }
+    } catch (e) {}
+    try {
+      const sess = DUEL_SESSIONS.get(sessionId);
+      if (sess && sess.msgId) {
+        const mainMsg = await channel.messages.fetch(sess.msgId).catch(() => null);
+        if (mainMsg) {
+          function renderHP(cur, max, len = 10) { const ratio = max > 0 ? cur / max : 0; const filled = Math.max(0, Math.min(len, Math.round(ratio * len))); return '▬'.repeat(filled) + '▭'.repeat(len - filled); }
+          const lines = attacker.cards.map((c, idx) => {
+            const name = c.card.name; const hp = Math.max(0, c.health); const extra = c.skipThisTurn ? ' (exhausted)' : ''; const stam = (typeof c.stamina === 'number') ? c.stamina : 3;
+            return `**${idx + 1}. ${name}**${extra} — HP: ${hp}/${c.maxHealth} ${renderHP(hp, c.maxHealth)} • <:stamina:1456082884732391570> ${stam}/3`;
+          }).join('\n');
+          const embed = makeEmbed("Your Turn", `${attacker.user}, choose a character to attack with!\n\n${lines}`);
+          await mainMsg.edit({ embeds: [embed], components: mainMsg.components }).catch(() => {});
+        }
+      }
+    } catch (e) {}
+    return;
+  }
+
+  if (ability === 'conq_aoe') {
+    if ((card.stamina || 0) < 3) { await interaction.followUp({ content: 'Not enough stamina for Conqueror AoE.', ephemeral: true }); return; }
+    card.stamina = Math.max(0, card.stamina - 3);
+    const stars = (card.haki && card.haki.conqueror && card.haki.conqueror.stars) || 0;
+    const base = 0.05; // 5% base even at 0 stars
+    const dmgPct = base + (stars * 0.10);
+    const dmg = Math.max(1, Math.round(card.maxHealth * dmgPct));
+    for (const c of defender.cards) {
+      if (c.health > 0) {
+        c.health = Math.max(0, c.health - dmg);
+        if (c.health <= 0) c.stamina = 0;
+        // Devil Fruit negation: if defender card is DF user and does NOT have advanced conqueror, nullify DF effects
+        if (DEVIL_FRUIT_USERS.has(c.cardId) && !(c.haki && c.haki.conqueror && c.haki.conqueror.advanced)) {
+          c.dfNegated = true;
+        }
+      }
+    }
+    try {
+      const killed = defender.cards.filter(c=>c.health<=0).map(c=>c.card.name);
+      const summary = new EmbedBuilder().setTitle('Conqueror AoE — Haki Used').setDescription(`${attacker.user} used **Conqueror AoE** with ${card.card.name}.\nDamage per enemy: ${dmg}\nStamina: ${card.stamina}/3\nKilled: ${killed.length ? killed.join(', ') : 'None'}`).setColor(0x3498db);
+      await channel.send({ embeds: [summary] }).catch(() => {});
+      const sess = DUEL_SESSIONS.get(sessionId);
+      if (sess && sess.msgId) {
+        const mainMsg = await channel.messages.fetch(sess.msgId).catch(() => null);
+        if (mainMsg) {
+          const charButtons = attacker.cards.map((c, idx) => new ButtonBuilder().setCustomId(`duel_selectchar:${sessionId}:${idx}`).setLabel(`${c.card.name}`).setStyle(ButtonStyle.Primary).setDisabled(c.health <= 0 || c.skipThisTurn || (typeof c.stamina === 'number' && c.stamina <= 0)));
+          const rows = [];
+          for (let i = 0; i < charButtons.length; i += 5) rows.push(new ActionRowBuilder().addComponents(charButtons.slice(i, i + 5)));
+          const anyHakiPlayable = attacker.cards.some(c => (c.haki && (c.haki.armament.present || c.haki.observation.present || c.haki.conqueror.present)) && c.health > 0 && !(typeof c.stamina === 'number' && c.stamina <= 0));
+          const hakiButton = new ButtonBuilder().setCustomId(`duel_haki:${sessionId}:all`).setLabel(`Haki`).setStyle(ButtonStyle.Secondary).setDisabled(!anyHakiPlayable);
+          rows.push(new ActionRowBuilder().addComponents(hakiButton));
+          function renderHP(cur, max, len = 10) { const ratio = max > 0 ? cur / max : 0; const filled = Math.max(0, Math.min(len, Math.round(ratio * len))); return '▬'.repeat(filled) + '▭'.repeat(len - filled); }
+          const lines = attacker.cards.map((c, idx) => { const name = c.card.name; const hp = Math.max(0, c.health); const extra = c.skipThisTurn ? ' (exhausted)' : ''; const stam = (typeof c.stamina === 'number') ? c.stamina : 3; return `**${idx + 1}. ${name}**${extra} — HP: ${hp}/${c.maxHealth} ${renderHP(hp, c.maxHealth)} • <:stamina:1456082884732391570> ${stam}/3`; }).join('\n');
+          const embed = makeEmbed("Your Turn", `${attacker.user}, choose a character to attack with!\n\n${lines}`);
+          await mainMsg.edit({ embeds: [embed], components: rows }).catch(() => {});
+        }
+      }
+    } catch (e) {}
+    try {
+      const sess = DUEL_SESSIONS.get(sessionId);
+      if (sess && sess.msgId) {
+        const mainMsg = await channel.messages.fetch(sess.msgId).catch(() => null);
+        if (mainMsg) {
+          function renderHP(cur, max, len = 10) { const ratio = max > 0 ? cur / max : 0; const filled = Math.max(0, Math.min(len, Math.round(ratio * len))); return '▬'.repeat(filled) + '▭'.repeat(len - filled); }
+          const lines = attacker.cards.map((c, idx) => {
+            const name = c.card.name; const hp = Math.max(0, c.health); const extra = c.skipThisTurn ? ' (exhausted)' : ''; const stam = (typeof c.stamina === 'number') ? c.stamina : 3;
+            return `**${idx + 1}. ${name}**${extra} — HP: ${hp}/${c.maxHealth} ${renderHP(hp, c.maxHealth)} • <:stamina:1456082884732391570> ${stam}/3`;
+          }).join('\n');
+          const embed = makeEmbed("Your Turn", `${attacker.user}, choose a character to attack with!\n\n${lines}`);
+          await mainMsg.edit({ embeds: [embed], components: mainMsg.components }).catch(() => {});
+        }
+      }
+    } catch (e) {}
+    return;
+  }
 }
 
 async function executeAttack(sessionId, charIdx, attackType, targetIdx, msg, attacker, defender, channel) {
@@ -572,7 +941,7 @@ async function executeAttack(sessionId, charIdx, attackType, targetIdx, msg, att
   if (!session) return;
 
   const attackerCard = attacker.cards[charIdx];
-  const targetCard = defender.cards[targetIdx];
+    let targetCard = defender.cards[targetIdx];
   const isP1 = attacker === session.p1;
 
   let damage = 0;
@@ -585,12 +954,29 @@ async function executeAttack(sessionId, charIdx, attackType, targetIdx, msg, att
       await msg.followUp({ content: "Not enough stamina to perform a normal attack!", ephemeral: true });
       return;
     }
-    // 5% miss chance
-    if (Math.random() < 0.05) {
+    // base 5% miss chance + defender dodge chance from Observation Haki
+    const defDodge = (targetCard && targetCard.dodgeChance) ? targetCard.dodgeChance : 0;
+    const totalMissChance = 0.05 + defDodge;
+    // Check session-level Future Sight (reliable dodge marker)
+    try {
+      const defenderKeyFS = (defender === session.p1) ? 'p1' : 'p2';
+      const fs = session[defenderKeyFS] && session[defenderKeyFS].futureSight;
+      if (fs && fs.cardIdx === targetIdx) {
+        isMiss = true;
+        // clear futureSight after it triggers
+        try { delete session[defenderKeyFS].futureSight; } catch (e) {}
+      }
+    } catch (e) {}
+
+    if (!isMiss && targetCard && targetCard.nextAttackGuaranteedDodge) {
+      isMiss = true;
+      targetCard.nextAttackGuaranteedDodge = false;
+    } else if (!isMiss && Math.random() < totalMissChance) {
       isMiss = true;
     } else {
       const range = attackerCard.scaled ? attackerCard.scaled.attackRange : (attackerCard.card.attackRange || [0,0]);
       damage = randInt(range[0], range[1]);
+      // stamina consumption handled at end of attack flow
     }
   } else {
     // Special attack button: guaranteed special attack when clicked
@@ -606,6 +992,7 @@ async function executeAttack(sessionId, charIdx, attackType, targetIdx, msg, att
       // mark that this card has used its special and schedule exhaustion next turn
       attackerCard.usedSpecial = true;
       attackerCard.skipNextTurnPending = true;
+      // stamina consumption handled at end of attack flow
     } else {
       // fallback to a normal attack if no special available
       const normalRange = attackerCard.scaled ? attackerCard.scaled.attackRange : (attackerCard.card.attackRange || [0,0]);
@@ -618,6 +1005,22 @@ async function executeAttack(sessionId, charIdx, attackType, targetIdx, msg, att
     await msg.followUp({ content: "That target is already knocked out.", ephemeral: true });
     return;
   }
+
+  // Ryou redirect: if the defender side has ryou active, redirect this incoming attack to the ryou card and deal zero damage
+  try {
+    const defenderKey = (defender === session.p1) ? 'p1' : 'p2';
+    const ryou = session[defenderKey] && session[defenderKey].ryou;
+    if (ryou && ryou.remaining > 0) {
+      const redirectIdx = ryou.cardIdx;
+      const redirectedCard = session[defenderKey].cards[redirectIdx];
+      if (redirectedCard && redirectedCard.health > 0) {
+        damage = 0;
+        targetCard = redirectedCard;
+        ryou.remaining = Math.max(0, ryou.remaining - 1);
+        await channel.send(`${session[defenderKey].user} redirected the attack to ${redirectedCard.card.name} with Ryou — no damage taken!`);
+      }
+    }
+  } catch (e) {}
 
   // Apply damage
   targetCard.health = Math.max(0, targetCard.health - damage);
@@ -663,6 +1066,8 @@ async function executeAttack(sessionId, charIdx, attackType, targetIdx, msg, att
 
   // If target was KO'd, normalize defender lifeIndex to first alive
   if (targetCard.health <= 0) {
+    // knocked out target should lose any remaining stamina
+    targetCard.stamina = 0;
     const idx = defender.cards.findIndex(c => c.health > 0);
     defender.lifeIndex = idx === -1 ? defender.cards.length : idx;
     // If a Support card was killed, recompute that team's boosts and adjust scaled stats
@@ -701,6 +1106,7 @@ async function executeAttack(sessionId, charIdx, attackType, targetIdx, msg, att
             c.health = Math.min(c.health, c.maxHealth);
             if (c.health <= 0) {
               c.health = 0;
+              c.stamina = 0;
               casualties.push(c.card.name);
             }
           }
@@ -811,9 +1217,10 @@ async function endDuel(sessionId, winner, loser, channel) {
   updatedLoseDuel.duelOpponents.set(winner.userId, (updatedLoseDuel.duelOpponents.get(winner.userId) || 0) + 1);
   await updatedLoseDuel.save();
 
+  const finishNote = session && session.timedOut ? `${loser.user.username} did not act in time and forfeited the duel.` : `${winner.user.username} wins the duel!`;
   const embed = makeEmbed(
     "Duel Finished",
-    `${winner.user.username} wins the duel!\n\nBounty: ${bounty}¥\nXP gained: ${xpGain}/100`
+    `${finishNote}\n\nBounty: ${bounty}¥\nXP gained: ${xpGain}/100`
   );
 
   try {
@@ -823,6 +1230,17 @@ async function endDuel(sessionId, winner, loser, channel) {
     await channel.send({ embeds: [embed] });
   }
 
+  DUEL_SESSIONS.delete(sessionId);
+}
+
+async function endDuelDraw(sessionId, channel) {
+  const session = DUEL_SESSIONS.get(sessionId);
+  if (!session) return;
+  const embed = makeEmbed("Duel Ended", "Both sides have no usable stamina — the duel ends in a draw.");
+  try {
+    const msg = await channel.messages.fetch(session.msgId).catch(() => null);
+    if (msg) await msg.reply({ embeds: [embed] }); else await channel.send({ embeds: [embed] });
+  } catch (e) { try { await channel.send({ embeds: [embed] }); } catch(_) {} }
   DUEL_SESSIONS.delete(sessionId);
 }
 
